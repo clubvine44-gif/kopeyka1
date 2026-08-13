@@ -279,7 +279,6 @@
 
     <section>
       <h2>Добавить запись <span class="sync-badge" id="syncBadge"><span class="sync-dot" id="syncDot"></span><span id="syncText">проверка…</span></span></h2>
-      <div class="hint">Одна строка — одна операция. Остальное посчитается само.</div>
       <form id="txForm">
         <div class="type-toggle">
           <button type="button" data-type="Расход" class="active">Расход</button>
@@ -347,7 +346,6 @@
 
     <section>
       <h2>Распределение 98 000 ₽</h2>
-      <div class="hint">План — и сколько по факту уже потрачено или отложено</div>
       <div class="stackbar" id="planBar"></div>
       <div class="plan-list" id="planList"></div>
       <div class="budget-rows" id="budgetList" style="margin-top:18px;"></div>
@@ -371,7 +369,6 @@
 
     <section>
       <h2>Цели</h2>
-      <div class="hint">Отмечай накопления как «Доход» с категорией «Накопление» — сумма пойдёт сюда автоматически, привязка к конкретной цели через комментарий (например «Подушка»). Записывай платежи по долгу как «Расход» → «Долг».</div>
       <div id="goalsBox"></div>
     </section>
   </div>
@@ -397,19 +394,16 @@
 
     <section>
       <h2>Месяц <select id="monthSelect" style="width:auto;display:inline-block;padding:4px 8px;font-size:12.5px;"></select></h2>
-      <div class="hint">Расходы по категориям</div>
       <div class="chart-box"><canvas id="catChart"></canvas></div>
     </section>
 
     <section>
       <h2>Динамика за год</h2>
-      <div class="hint">Доход, расходы и накопления по месяцам</div>
       <div class="chart-box"><canvas id="trendChart"></canvas></div>
     </section>
 
     <section>
       <h2>Траты по типу дня</h2>
-      <div class="hint">Где утекает больше — в ночь, в день или на выходных</div>
       <div class="chart-box" style="height:190px;"><canvas id="shiftChart"></canvas></div>
     </section>
   </div>
@@ -422,7 +416,6 @@
     </div>
 
     <section>
-      <div class="hint">Скопировать сводку — можно скинуть себе в Телеграм</div>
       <button class="submit-btn" id="copyReportBtn" style="background:var(--surface-2);color:var(--text);border:1px solid var(--line);">Скопировать отчёт</button>
     </section>
   </div>
