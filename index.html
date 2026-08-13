@@ -217,110 +217,202 @@
   .budget-row-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;}
   .budget-name{font-weight:600;}
   .budget-figures{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);}
+
+  /* Page router */
+  .page{display:none;}
+  .page.active{display:block;animation:pagein .18s ease;}
+  @keyframes pagein{ from{opacity:0; transform:translateX(8px);} to{opacity:1; transform:translateX(0);} }
+
+  .page-header{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .page-back{
+    background:var(--surface);border:1px solid var(--line);color:var(--text);
+    border-radius:9px;padding:8px 13px;font-size:13.5px;font-family:'Inter';cursor:pointer;flex-shrink:0;
+  }
+  .page-back:active{transform:scale(.97);}
+  .page-header h1{font-family:'Fraunces',serif;font-weight:600;font-size:21px;margin:0;letter-spacing:-.01em;}
+
+  .nav-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;}
+  .nav-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:16px 14px;text-align:left;cursor:pointer;color:var(--text);
+    font-family:'Inter';display:flex;flex-direction:column;gap:3px;
+  }
+  .nav-card:active{transform:scale(.98);background:var(--surface-2);}
+  .nav-icon{font-size:20px;}
+  .nav-label{font-weight:600;font-size:14px;}
+  .nav-sub{font-size:11.5px;color:var(--muted);}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <header>
-    <div class="eyebrow">Личный финансовый центр</div>
-    <h1>Копейка</h1>
-    <div class="sub">Всё, что вбиваешь — сразу видно, а не просто записано</div>
-  </header>
+  <!-- ============ HOME ============ -->
+  <div class="page active" id="page-home">
+    <header>
+      <div class="eyebrow">Личный финансовый центр</div>
+      <h1>Копейка</h1>
+      <div class="sub">Главное — на одном экране, остальное — в один тап</div>
+    </header>
 
-  <section class="hero">
-    <div class="hero-label">Можно потратить сегодня</div>
-    <div class="hero-value" id="heroDaily">—</div>
-    <div class="hero-sub" id="heroSub">—</div>
-    <div class="hero-warn" id="heroWarn" style="display:none;"></div>
-    <div class="reserves" id="heroReserves"></div>
-  </section>
+    <section class="hero">
+      <div class="hero-label">Можно потратить сегодня</div>
+      <div class="hero-value" id="heroDaily">—</div>
+      <div class="hero-sub" id="heroSub">—</div>
+      <div class="hero-warn" id="heroWarn" style="display:none;"></div>
+      <div class="reserves" id="heroReserves"></div>
+    </section>
 
-  <div class="stats">
-    <div class="stat"><div class="lbl">Доход · месяц</div><div class="val pos" id="statIncome">0 ₽</div></div>
-    <div class="stat"><div class="lbl">Расходы · месяц</div><div class="val neg" id="statExpense">0 ₽</div></div>
-    <div class="stat"><div class="lbl">Остаток</div><div class="val" id="statRemain">0 ₽</div></div>
-    <div class="stat"><div class="lbl">Норма накопления</div><div class="val gold" id="statRate">0%</div></div>
+    <section>
+      <h2>Добавить запись <span class="sync-badge" id="syncBadge"><span class="sync-dot" id="syncDot"></span><span id="syncText">проверка…</span></span></h2>
+      <div class="hint">Одна строка — одна операция. Остальное посчитается само.</div>
+      <form id="txForm">
+        <div class="type-toggle">
+          <button type="button" data-type="Расход" class="active">Расход</button>
+          <button type="button" data-type="Доход">Доход</button>
+        </div>
+        <div class="row2">
+          <input type="date" id="txDate" required>
+          <input type="number" id="txAmount" placeholder="Сумма, ₽" required min="0">
+        </div>
+        <select id="txCategory"></select>
+        <select id="txShift">
+          <option value="">Смена — не указана</option>
+          <option value="Ночь">Ночная смена</option>
+          <option value="День">Дневная смена</option>
+          <option value="Выходной">Выходной</option>
+        </select>
+        <input type="text" id="txComment" placeholder="Комментарий (необязательно)">
+        <button type="submit" class="submit-btn">Добавить</button>
+      </form>
+    </section>
+
+    <div class="nav-grid">
+      <button class="nav-card" data-goto="budget">
+        <span class="nav-icon">💰</span>
+        <span class="nav-label">Бюджет месяца</span>
+        <span class="nav-sub">План и факт по категориям</span>
+      </button>
+      <button class="nav-card" data-goto="debtgoals">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label">Долг и цели</span>
+        <span class="nav-sub">Прогресс и история</span>
+      </button>
+      <button class="nav-card" data-goto="transactions">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Записи</span>
+        <span class="nav-sub">История операций</span>
+      </button>
+      <button class="nav-card" data-goto="analytics">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Аналитика</span>
+        <span class="nav-sub">Графики и тренды</span>
+      </button>
+      <button class="nav-card" data-goto="report" style="grid-column:1 / -1;">
+        <span class="nav-icon">🧾</span>
+        <span class="nav-label">Отчёт месяца</span>
+        <span class="nav-sub">Скопировать сводку в Телеграм</span>
+      </button>
+    </div>
+
+    <footer>ДАННЫЕ ХРАНЯТСЯ В SUPABASE — ОТКРОЕШЬ С ЛЮБОГО УСТРОЙСТВА</footer>
   </div>
 
-  <section>
-    <h2>Бюджет месяца</h2>
-    <div class="hint">Как распределены 98 000 ₽ — и сколько по факту уже потрачено или отложено</div>
-    <div class="stackbar" id="planBar"></div>
-    <div class="plan-list" id="planList"></div>
-    <div class="budget-rows" id="budgetList" style="margin-top:18px;"></div>
-    <div class="hint" id="cigNote" style="margin-top:10px;margin-bottom:0;"></div>
-  </section>
+  <!-- ============ BUDGET ============ -->
+  <div class="page" id="page-budget">
+    <div class="page-header">
+      <button class="page-back" data-back>← Назад</button>
+      <h1>Бюджет месяца</h1>
+    </div>
 
-  <section>
-    <h2>Добавить запись <span class="sync-badge" id="syncBadge"><span class="sync-dot" id="syncDot"></span><span id="syncText">проверка…</span></span></h2>
-    <div class="hint">Одна строка — одна операция. Остальное посчитается само.</div>
-    <form id="txForm">
-      <div class="type-toggle">
-        <button type="button" data-type="Расход" class="active">Расход</button>
-        <button type="button" data-type="Доход">Доход</button>
-      </div>
-      <div class="row2">
-        <input type="date" id="txDate" required>
-        <input type="number" id="txAmount" placeholder="Сумма, ₽" required min="0">
-      </div>
-      <select id="txCategory"></select>
-      <select id="txShift">
-        <option value="">Смена — не указана</option>
-        <option value="Ночь">Ночная смена</option>
-        <option value="День">Дневная смена</option>
-        <option value="Выходной">Выходной</option>
-      </select>
-      <input type="text" id="txComment" placeholder="Комментарий (необязательно)">
-      <button type="submit" class="submit-btn">Добавить</button>
-    </form>
-  </section>
+    <div class="stats">
+      <div class="stat"><div class="lbl">Доход · месяц</div><div class="val pos" id="statIncome">0 ₽</div></div>
+      <div class="stat"><div class="lbl">Расходы · месяц</div><div class="val neg" id="statExpense">0 ₽</div></div>
+      <div class="stat"><div class="lbl">Остаток</div><div class="val" id="statRemain">0 ₽</div></div>
+      <div class="stat"><div class="lbl">Норма накопления</div><div class="val gold" id="statRate">0%</div></div>
+    </div>
 
-  <section>
-    <h2>Долг</h2>
-    <div class="hint" id="debtHint">—</div>
-    <div class="bar"><div class="bar-fill" id="debtBar" style="width:0%;"></div></div>
-    <div class="chart-box" style="height:130px;margin-top:14px;"><canvas id="debtChart"></canvas></div>
-  </section>
+    <section>
+      <h2>Распределение 98 000 ₽</h2>
+      <div class="hint">План — и сколько по факту уже потрачено или отложено</div>
+      <div class="stackbar" id="planBar"></div>
+      <div class="plan-list" id="planList"></div>
+      <div class="budget-rows" id="budgetList" style="margin-top:18px;"></div>
+      <div class="hint" id="cigNote" style="margin-top:10px;margin-bottom:0;"></div>
+    </section>
+  </div>
 
-  <section>
-    <h2>Цели</h2>
-    <div class="hint">Отмечай накопления как «Доход» с категорией «Накопление» — сумма пойдёт сюда автоматически, привязка к конкретной цели через комментарий (например «Подушка»). Записывай платежи по долгу как «Расход» → «Долг».</div>
-    <div id="goalsBox"></div>
-  </section>
+  <!-- ============ DEBT & GOALS ============ -->
+  <div class="page" id="page-debtgoals">
+    <div class="page-header">
+      <button class="page-back" data-back>← Назад</button>
+      <h1>Долг и цели</h1>
+    </div>
 
-  <section>
-    <h2>Последние записи</h2>
-    <div class="tx-list" id="txList"></div>
-  </section>
+    <section>
+      <h2>Долг</h2>
+      <div class="hint" id="debtHint">—</div>
+      <div class="bar"><div class="bar-fill" id="debtBar" style="width:0%;"></div></div>
+      <div class="chart-box" style="height:130px;margin-top:14px;"><canvas id="debtChart"></canvas></div>
+    </section>
 
-  <div class="analytics-label">Аналитика</div>
+    <section>
+      <h2>Цели</h2>
+      <div class="hint">Отмечай накопления как «Доход» с категорией «Накопление» — сумма пойдёт сюда автоматически, привязка к конкретной цели через комментарий (например «Подушка»). Записывай платежи по долгу как «Расход» → «Долг».</div>
+      <div id="goalsBox"></div>
+    </section>
+  </div>
 
-  <section>
-    <h2>Месяц <select id="monthSelect" style="width:auto;display:inline-block;padding:4px 8px;font-size:12.5px;"></select></h2>
-    <div class="hint">Расходы по категориям</div>
-    <div class="chart-box"><canvas id="catChart"></canvas></div>
-  </section>
+  <!-- ============ TRANSACTIONS ============ -->
+  <div class="page" id="page-transactions">
+    <div class="page-header">
+      <button class="page-back" data-back>← Назад</button>
+      <h1>Последние записи</h1>
+    </div>
 
-  <section>
-    <h2>Динамика за год</h2>
-    <div class="hint">Доход, расходы и накопления по месяцам</div>
-    <div class="chart-box"><canvas id="trendChart"></canvas></div>
-  </section>
+    <section>
+      <div class="tx-list" id="txList"></div>
+    </section>
+  </div>
 
-  <section>
-    <h2>Траты по типу дня</h2>
-    <div class="hint">Где утекает больше — в ночь, в день или на выходных</div>
-    <div class="chart-box" style="height:190px;"><canvas id="shiftChart"></canvas></div>
-  </section>
+  <!-- ============ ANALYTICS ============ -->
+  <div class="page" id="page-analytics">
+    <div class="page-header">
+      <button class="page-back" data-back>← Назад</button>
+      <h1>Аналитика</h1>
+    </div>
 
-  <section>
-    <h2>Отчёт месяца</h2>
-    <div class="hint">Скопировать сводку — можно скинуть себе в Телеграм</div>
-    <button class="submit-btn" id="copyReportBtn" style="background:var(--surface-2);color:var(--text);border:1px solid var(--line);">Скопировать отчёт</button>
-  </section>
+    <section>
+      <h2>Месяц <select id="monthSelect" style="width:auto;display:inline-block;padding:4px 8px;font-size:12.5px;"></select></h2>
+      <div class="hint">Расходы по категориям</div>
+      <div class="chart-box"><canvas id="catChart"></canvas></div>
+    </section>
 
-  <footer>ДАННЫЕ ХРАНЯТСЯ В SUPABASE — ОТКРОЕШЬ С ЛЮБОГО УСТРОЙСТВА</footer>
+    <section>
+      <h2>Динамика за год</h2>
+      <div class="hint">Доход, расходы и накопления по месяцам</div>
+      <div class="chart-box"><canvas id="trendChart"></canvas></div>
+    </section>
+
+    <section>
+      <h2>Траты по типу дня</h2>
+      <div class="hint">Где утекает больше — в ночь, в день или на выходных</div>
+      <div class="chart-box" style="height:190px;"><canvas id="shiftChart"></canvas></div>
+    </section>
+  </div>
+
+  <!-- ============ REPORT ============ -->
+  <div class="page" id="page-report">
+    <div class="page-header">
+      <button class="page-back" data-back>← Назад</button>
+      <h1>Отчёт месяца</h1>
+    </div>
+
+    <section>
+      <div class="hint">Скопировать сводку — можно скинуть себе в Телеграм</div>
+      <button class="submit-btn" id="copyReportBtn" style="background:var(--surface-2);color:var(--text);border:1px solid var(--line);">Скопировать отчёт</button>
+    </section>
+  </div>
+
 </div>
 
 <script>
@@ -957,6 +1049,40 @@ document.getElementById('copyReportBtn').addEventListener('click', async ()=>{
   setTimeout(()=>{ btn.textContent = 'Скопировать отчёт'; }, 2200);
 });
 
+// ===== Page router =====
+const PAGE_IDS = ['home','budget','debtgoals','transactions','analytics','report'];
+
+function showPage(pageId, push){
+  if(!PAGE_IDS.includes(pageId)) pageId = 'home';
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const target = document.getElementById('page-' + pageId);
+  if(target) target.classList.add('active');
+  window.scrollTo(0, 0);
+  if(push) history.pushState({ page: pageId }, '', '#' + pageId);
+  requestAnimationFrame(refreshChartsForVisiblePage);
+}
+
+function refreshChartsForVisiblePage(){
+  const monthIdx = parseInt(document.getElementById('monthSelect').value || 0);
+  const monthTxs = txsForMonth(monthIdx);
+  safeCall(()=>renderCatChart(monthTxs));
+  safeCall(()=>renderTrendChart());
+  safeCall(()=>renderShiftChart(monthTxs));
+  safeCall(()=>renderDebtHistory());
+}
+
+document.querySelectorAll('[data-goto]').forEach(btn=>{
+  btn.addEventListener('click', ()=> showPage(btn.dataset.goto, true));
+});
+document.querySelectorAll('[data-back]').forEach(btn=>{
+  btn.addEventListener('click', ()=> history.back());
+});
+
+window.addEventListener('popstate', (e)=>{
+  const pageId = (e.state && e.state.page) || 'home';
+  showPage(pageId, false);
+});
+
 (async function init(){
   document.getElementById('txDate').valueAsDate = new Date();
   populateCategorySelect();
@@ -964,6 +1090,10 @@ document.getElementById('copyReportBtn').addEventListener('click', async ()=>{
   safeCall(renderBudgetPlan);
   await loadTxs();
   render();
+
+  const initialPage = (location.hash ? location.hash.slice(1) : 'home');
+  history.replaceState({ page: PAGE_IDS.includes(initialPage) ? initialPage : 'home' }, '');
+  showPage(PAGE_IDS.includes(initialPage) ? initialPage : 'home', false);
 
   if('serviceWorker' in navigator){
     try{ await navigator.serviceWorker.register('sw.js'); }
