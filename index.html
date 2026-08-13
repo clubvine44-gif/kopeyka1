@@ -119,31 +119,6 @@
 
   .chart-box{position:relative;height:230px;}
 
-  /* Coins for budget limits */
-  .coins{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;}
-  .coin-item{flex:1 1 70px;text-align:center;min-width:70px;}
-  .coin{
-    width:64px;height:64px;border-radius:50%;
-    margin:0 auto 8px;
-    display:flex;align-items:center;justify-content:center;
-    position:relative;
-    background:conic-gradient(var(--ring-color,var(--gold)) calc(var(--pct,0)*1%), var(--surface-2) 0);
-  }
-  .coin::after{
-    content:'';
-    position:absolute;inset:6px;
-    border-radius:50%;
-    background:var(--surface);
-    border:1px solid var(--line);
-  }
-  .coin span{
-    position:relative;z-index:1;
-    font-family:'IBM Plex Mono',monospace;
-    font-size:12px;font-weight:600;
-  }
-  .coin-name{font-size:11.5px;color:var(--muted);margin-bottom:2px;}
-  .coin-amt{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--faint);}
-
   /* Goals */
   .goal{margin-bottom:14px;}
   .goal:last-child{margin-bottom:0;}
@@ -236,6 +211,12 @@
   .plan-name{flex:1;font-size:13.5px;}
   .plan-amt{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--muted);white-space:nowrap;}
   .plan-pct{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint);width:38px;text-align:right;}
+
+  .budget-row{margin-bottom:13px;}
+  .budget-row:last-child{margin-bottom:0;}
+  .budget-row-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;}
+  .budget-name{font-weight:600;}
+  .budget-figures{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -263,10 +244,12 @@
   </div>
 
   <section>
-    <h2>План на месяц</h2>
-    <div class="hint">Как распределены 98 000 ₽ дохода — ориентир, куда что должно уйти</div>
+    <h2>Бюджет месяца</h2>
+    <div class="hint">Как распределены 98 000 ₽ — и сколько по факту уже потрачено или отложено</div>
     <div class="stackbar" id="planBar"></div>
     <div class="plan-list" id="planList"></div>
+    <div class="budget-rows" id="budgetList" style="margin-top:18px;"></div>
+    <div class="hint" id="cigNote" style="margin-top:10px;margin-bottom:0;"></div>
   </section>
 
   <section>
@@ -294,16 +277,10 @@
   </section>
 
   <section>
-    <h2>Контроль лимитов</h2>
-    <div class="hint">Заполняется от края к краю по мере трат в этом месяце</div>
-    <div class="coins" id="coinsBox"></div>
-    <div class="hint" id="cigNote" style="margin-top:12px;margin-bottom:0;"></div>
-  </section>
-
-  <section>
     <h2>Долг</h2>
     <div class="hint" id="debtHint">—</div>
     <div class="bar"><div class="bar-fill" id="debtBar" style="width:0%;"></div></div>
+    <div class="chart-box" style="height:130px;margin-top:14px;"><canvas id="debtChart"></canvas></div>
   </section>
 
   <section>
@@ -530,8 +507,9 @@ function render(){
 
   safeCall(()=>renderCatChart(monthTxs));
   safeCall(()=>renderTrendChart());
-  safeCall(()=>renderCoins(monthTxs, expense));
+  safeCall(()=>renderBudgetSection(monthTxs));
   safeCall(()=>renderDebt(monthTxs));
+  safeCall(()=>renderDebtHistory());
   safeCall(()=>renderGoals());
   safeCall(()=>renderTxList());
   safeCall(()=>renderPayday(monthTxs, expense));
@@ -747,39 +725,37 @@ function renderTrendChart(){
   });
 }
 
-function renderCoins(monthTxs, totalExpense){
-  const box = document.getElementById('coinsBox');
-  box.innerHTML = '';
-  LIMITS.forEach(l=>{
-    let fact;
-    if(l.exclude){
-      fact = monthTxs.filter(t=>t.type==='Расход' && !l.exclude.includes(t.category)).reduce((s,t)=>s+t.amount,0);
-    } else {
-      fact = monthTxs.filter(t=>t.type==='Расход' && l.match.includes(t.category)).reduce((s,t)=>s+t.amount,0);
-    }
-    const pct = Math.min(100, Math.round(fact/l.limit*100));
-    const over = fact > l.limit;
-    const color = over ? 'var(--rust)' : (pct > 80 ? '#c98b5f' : 'var(--gold)');
-    const el = document.createElement('div');
-    el.className = 'coin-item';
-    el.innerHTML = `
-      <div class="coin-name">${l.name}</div>
-      <div class="coin" style="--pct:${pct};--ring-color:${color}"><span>${pct}%</span></div>
-      <div class="coin-amt">${fmt(fact)} / ${fmt(l.limit)}</div>
+const BUDGET_ITEMS = [
+  { name:'Обязательные платежи', planned: OBLIGATIONS_TOTAL,
+    factFn: mt => mt.filter(t=>t.type==='Расход' && t.category==='Обязательные платежи').reduce((s,t)=>s+t.amount,0) },
+  { name:'Долг', planned: DEBT.monthly,
+    factFn: mt => mt.filter(t=>t.type==='Расход' && t.category===DEBT.category).reduce((s,t)=>s+t.amount,0) },
+  { name:'Цели (накопления)', planned: GOALS.reduce((s,g)=>s+g.monthly,0),
+    factFn: mt => mt.filter(t=>t.type==='Доход' && t.category==='Накопление').reduce((s,t)=>s+t.amount,0) },
+  { name:'Пиво и сигареты', planned: 10000,
+    factFn: mt => mt.filter(t=>t.type==='Расход' && ['Сигареты','Алкоголь'].includes(t.category)).reduce((s,t)=>s+t.amount,0) },
+  { name:'Прочие траты', planned: LIMITS.find(l=>l.name==='Прочие траты').limit,
+    factFn: mt => mt.filter(t=>t.type==='Расход' && !['Обязательные платежи','Долг','Сигареты','Алкоголь'].includes(t.category)).reduce((s,t)=>s+t.amount,0) },
+];
+
+function renderBudgetSection(monthTxs){
+  const box = document.getElementById('budgetList');
+  if(!box) return;
+  box.innerHTML = BUDGET_ITEMS.map(item=>{
+    const fact = item.factFn(monthTxs);
+    const pct = Math.min(100, Math.round(fact/item.planned*100));
+    const over = fact > item.planned;
+    const color = over ? 'var(--rust)' : (pct > 85 ? '#c98b5f' : 'var(--gold)');
+    return `
+      <div class="budget-row">
+        <div class="budget-row-top">
+          <span class="budget-name">${item.name}</span>
+          <span class="budget-figures">${fmt(fact)} / ${fmt(item.planned)}</span>
+        </div>
+        <div class="bar"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+      </div>
     `;
-    box.appendChild(el);
-  });
-  const obligPaid = monthTxs.filter(t=>t.type==='Расход' && t.category==='Обязательные платежи').reduce((s,t)=>s+t.amount,0);
-  const obligPct = Math.min(100, Math.round(obligPaid/OBLIGATIONS_TOTAL*100));
-  const obligColor = obligPct >= 100 ? 'var(--mint)' : 'var(--gold)';
-  const obligEl = document.createElement('div');
-  obligEl.className = 'coin-item';
-  obligEl.innerHTML = `
-    <div class="coin-name">Обязательные (25 числа)</div>
-    <div class="coin" style="--pct:${obligPct};--ring-color:${obligColor}"><span>${obligPct}%</span></div>
-    <div class="coin-amt">${fmt(obligPaid)} / ${fmt(OBLIGATIONS_TOTAL)}</div>
-  `;
-  box.appendChild(obligEl);
+  }).join('');
 }
 
 function renderDebt(monthTxs){
@@ -794,6 +770,33 @@ function renderDebt(monthTxs){
       ? 'Долг полностью закрыт 🎉'
       : `Осталось ${fmt(remaining)} из ${fmt(DEBT.total)}. Ориентир — ${fmt(DEBT.monthly)}/мес, ещё примерно ${monthsLeft} мес. до закрытия. В этом месяце внесено: ${fmt(paidThisMonth)}.`;
   document.getElementById('debtBar').style.width = pct + '%';
+}
+
+let debtChart;
+function renderDebtHistory(){
+  const y = currentYear();
+  const paidByMonth = MONTHS.map((m,i)=>{
+    const mt = txsForMonth(i);
+    return mt.filter(t=>t.type==='Расход' && t.category===DEBT.category).reduce((s,t)=>s+t.amount,0);
+  });
+  const ctx = document.getElementById('debtChart');
+  if(!ctx) return;
+  if(debtChart) debtChart.destroy();
+  debtChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: MONTHS,
+      datasets:[{ data: paidByMonth, backgroundColor: paidByMonth.map(v => v >= DEBT.monthly ? '#5fbca5' : (v>0 ? '#d4af37' : '#3a3126')), borderRadius:3 }]
+    },
+    options:{
+      maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ ticks:{color:'#9c9384',font:{family:'IBM Plex Mono',size:9}}, grid:{display:false} },
+        y:{ ticks:{color:'#9c9384',font:{family:'IBM Plex Mono',size:9}}, grid:{color:'#3a3126'} }
+      }
+    }
+  });
 }
 
 function renderGoals(){
