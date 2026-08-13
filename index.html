@@ -338,6 +338,8 @@ async function loadTxs(){
   }catch(e){ txs = []; }
 }
 
+let lastInsertError = '';
+
 async function insertTx(tx){
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions`, {
@@ -345,10 +347,15 @@ async function insertTx(tx){
       headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
       body: JSON.stringify(tx)
     });
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok){
+      const bodyText = await res.text();
+      lastInsertError = `HTTP ${res.status}: ${bodyText.slice(0,120)}`;
+      throw new Error(lastInsertError);
+    }
     const rows = await res.json();
     return rows[0];
   }catch(e){
+    if(!lastInsertError) lastInsertError = e.message || String(e);
     console.error('Не удалось сохранить в Supabase:', e);
     return null;
   }
@@ -709,6 +716,7 @@ document.getElementById('txForm').addEventListener('submit', async (e)=>{
   if(!date || !amount) return;
 
   const newTx = { date, type: currentType, category, amount, comment, shift };
+  lastInsertError = '';
   const inserted = await insertTx(newTx);
 
   if(inserted){
@@ -727,8 +735,8 @@ document.getElementById('txForm').addEventListener('submit', async (e)=>{
   if(!inserted){
     const btn = e.target.querySelector('.submit-btn');
     const original = btn.textContent;
-    btn.textContent = 'Добавлено (не синхронизировалось с облаком)';
-    setTimeout(()=>{ btn.textContent = original; }, 2800);
+    btn.textContent = 'Сохранено локально. Ошибка облака: ' + lastInsertError;
+    setTimeout(()=>{ btn.textContent = original; }, 5000);
   }
 });
 
