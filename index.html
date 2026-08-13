@@ -86,6 +86,16 @@
   .stat .val.neg{color:var(--rust);}
   .stat .val.gold{color:var(--gold);}
 
+  .remain-card{
+    text-align:center;
+    padding:14px 16px;
+    margin-bottom:14px;
+  }
+  .remain-card .lbl{font-size:11px;}
+  .remain-card .val{font-size:26px;font-family:'Fraunces',serif;font-weight:600;}
+  .remain-card .val.pos{color:var(--mint);}
+  .remain-card .val.neg{color:var(--rust);}
+
   section{
     background:var(--surface);
     border:1px solid var(--line);
@@ -262,6 +272,11 @@
       <div class="reserves" id="heroReserves"></div>
     </section>
 
+    <div class="stat remain-card">
+      <div class="lbl">Остаток за месяц</div>
+      <div class="val" id="statRemain">0 ₽</div>
+    </div>
+
     <section>
       <h2>Добавить запись <span class="sync-badge" id="syncBadge"><span class="sync-dot" id="syncDot"></span><span id="syncText">проверка…</span></span></h2>
       <div class="hint">Одна строка — одна операция. Остальное посчитается само.</div>
@@ -327,7 +342,6 @@
     <div class="stats">
       <div class="stat"><div class="lbl">Доход · месяц</div><div class="val pos" id="statIncome">0 ₽</div></div>
       <div class="stat"><div class="lbl">Расходы · месяц</div><div class="val neg" id="statExpense">0 ₽</div></div>
-      <div class="stat"><div class="lbl">Остаток</div><div class="val" id="statRemain">0 ₽</div></div>
       <div class="stat"><div class="lbl">Норма накопления</div><div class="val gold" id="statRate">0%</div></div>
     </div>
 
