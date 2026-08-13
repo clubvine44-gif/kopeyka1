@@ -216,6 +216,15 @@
   }
 
   .tx-edit{background:none;border:none;color:var(--faint);font-size:14px;cursor:pointer;padding:0 8px 0 4px;}
+
+  .stackbar{display:flex;height:16px;border-radius:8px;overflow:hidden;border:1px solid var(--line);margin-bottom:14px;}
+  .stackbar-seg{height:100%;}
+  .plan-list{display:flex;flex-direction:column;gap:10px;}
+  .plan-item{display:flex;align-items:center;gap:10px;}
+  .plan-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+  .plan-name{flex:1;font-size:13.5px;}
+  .plan-amt{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--muted);white-space:nowrap;}
+  .plan-pct{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint);width:38px;text-align:right;}
 </style>
 </head>
 <body>
@@ -240,6 +249,13 @@
     <div class="stat"><div class="lbl">Остаток</div><div class="val" id="statRemain">0 ₽</div></div>
     <div class="stat"><div class="lbl">Норма накопления</div><div class="val gold" id="statRate">0%</div></div>
   </div>
+
+  <section>
+    <h2>План на месяц</h2>
+    <div class="hint">Как распределены 98 000 ₽ дохода — ориентир, куда что должно уйти</div>
+    <div class="stackbar" id="planBar"></div>
+    <div class="plan-list" id="planList"></div>
+  </section>
 
   <section>
     <h2>Добавить запись <span class="sync-badge" id="syncBadge"><span class="sync-dot" id="syncDot"></span><span id="syncText">проверка…</span></span></h2>
@@ -489,12 +505,11 @@ function render(){
 
   const income = monthTxs.filter(t=>t.type==='Доход' && t.category!=='Накопление').reduce((s,t)=>s+t.amount,0);
   const savingsIncome = monthTxs.filter(t=>t.type==='Доход' && t.category==='Накопление').reduce((s,t)=>s+t.amount,0);
-  const totalIncome = income + savingsIncome;
   const expense = monthTxs.filter(t=>t.type==='Расход').reduce((s,t)=>s+t.amount,0);
-  const remain = totalIncome - expense;
-  const rate = totalIncome > 0 ? (savingsIncome/totalIncome*100) : 0;
+  const remain = income - expense - savingsIncome;
+  const rate = income > 0 ? (savingsIncome/income*100) : 0;
 
-  document.getElementById('statIncome').textContent = fmt(totalIncome);
+  document.getElementById('statIncome').textContent = fmt(income);
   document.getElementById('statExpense').textContent = fmt(expense);
   const remainEl = document.getElementById('statRemain');
   remainEl.textContent = fmt(remain);
@@ -548,6 +563,39 @@ function renderPayday(monthTxs, expenseSoFar){
     `${daysLeft} ${daysWord(daysLeft)} до зарплаты (${paydayDate.toLocaleDateString('ru-RU', {day:'2-digit', month:'long'})})`;
   document.getElementById('heroDetail').textContent =
     `Из ${fmt(monthLimit)} на прочие траты отложено: ${fmt(goalReserveLeft)} на цели, ${fmt(obligReserveLeft)} на обязательные платежи, ${fmt(debtReserveLeft)} на долг.`;
+}
+
+function renderBudgetPlan(){
+  const items = [
+    { name:'Обязательные платежи', amount: OBLIGATIONS_TOTAL, color:'#d9614f' },
+    { name:'Долг', amount: DEBT.monthly, color:'#c98b5f' },
+    { name:'Цели (накопления)', amount: GOALS.reduce((s,g)=>s+g.monthly,0), color:'#d4af37' },
+    { name:'Пиво и сигареты', amount: 10000, color:'#7a8fbf' },
+    { name:'Прочие траты', amount: LIMITS.find(l=>l.name==='Прочие траты').limit, color:'#5fbca5' },
+  ];
+  const bar = document.getElementById('planBar');
+  const list = document.getElementById('planList');
+  if(!bar || !list) return;
+  bar.innerHTML = '';
+  list.innerHTML = '';
+  items.forEach(it=>{
+    const pct = (it.amount / MONTHLY_INCOME * 100);
+    const seg = document.createElement('div');
+    seg.className = 'stackbar-seg';
+    seg.style.width = pct + '%';
+    seg.style.background = it.color;
+    bar.appendChild(seg);
+
+    const row = document.createElement('div');
+    row.className = 'plan-item';
+    row.innerHTML = `
+      <div class="plan-dot" style="background:${it.color}"></div>
+      <div class="plan-name">${it.name}</div>
+      <div class="plan-amt">${fmt(it.amount)}</div>
+      <div class="plan-pct">${Math.round(pct)}%</div>
+    `;
+    list.appendChild(row);
+  });
 }
 
 function daysWord(n){
@@ -639,7 +687,7 @@ function renderTrendChart(){
     const inc = mt.filter(t=>t.type==='Доход' && t.category!=='Накопление').reduce((s,t)=>s+t.amount,0);
     const sav = mt.filter(t=>t.type==='Доход' && t.category==='Накопление').reduce((s,t)=>s+t.amount,0);
     const exp = mt.filter(t=>t.type==='Расход').reduce((s,t)=>s+t.amount,0);
-    incomeArr.push(inc+sav); expenseArr.push(exp); savingsArr.push(sav);
+    incomeArr.push(inc); expenseArr.push(exp); savingsArr.push(sav);
   });
   const ctx = document.getElementById('trendChart');
   if(trendChart) trendChart.destroy();
@@ -875,6 +923,7 @@ document.getElementById('copyReportBtn').addEventListener('click', async ()=>{
   document.getElementById('txDate').valueAsDate = new Date();
   populateCategorySelect();
   setupMonthSelect();
+  safeCall(renderBudgetPlan);
   await loadTxs();
   render();
 
