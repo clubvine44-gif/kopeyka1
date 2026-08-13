@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kopeyka-shell-v1';
+const CACHE_NAME = 'kopeyka-shell-v2';
 const SHELL_FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -25,17 +25,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App shell: cache-first, falling back to network
+  // Network-first: always try to get the freshest version.
+  // Cache is only a fallback for when there's no internet connection.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        if (response && response.status === 200 && event.request.method === 'GET') {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => cached);
-    })
+    fetch(event.request).then((response) => {
+      if (response && response.status === 200 && event.request.method === 'GET') {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+      }
+      return response;
+    }).catch(() => caches.match(event.request))
   );
 });
