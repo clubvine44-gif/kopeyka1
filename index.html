@@ -186,6 +186,36 @@
   .empty{color:var(--faint);font-size:13px;text-align:center;padding:18px 0;}
 
   footer{text-align:center;color:var(--faint);font-size:11.5px;margin-top:26px;font-family:'IBM Plex Mono',monospace;}
+
+  .hero{
+    text-align:center;
+    background:radial-gradient(500px 200px at 50% -30%, rgba(212,175,55,.12), transparent), var(--surface);
+    border:1px solid var(--gold-dim);
+    padding:24px 16px 20px;
+  }
+  .hero-label{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--gold-dim);margin-bottom:8px;
+  }
+  .hero-value{font-family:'Fraunces',serif;font-weight:700;font-size:46px;color:var(--gold);line-height:1;}
+  .hero-sub{color:var(--muted);font-size:13px;margin-top:8px;}
+  .hero-detail{color:var(--faint);font-size:11.5px;margin-top:6px;}
+
+  .sync-badge{
+    display:inline-flex;align-items:center;gap:5px;
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+    color:var(--faint);font-weight:400;text-transform:none;letter-spacing:0;
+  }
+  .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--faint);}
+  .sync-dot.online{background:var(--mint);}
+  .sync-dot.offline{background:var(--rust);}
+
+  .analytics-label{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--faint);margin:22px 2px 4px;
+  }
+
+  .tx-edit{background:none;border:none;color:var(--faint);font-size:14px;cursor:pointer;padding:0 8px 0 4px;}
 </style>
 </head>
 <body>
@@ -197,6 +227,13 @@
     <div class="sub">Всё, что вбиваешь — сразу видно, а не просто записано</div>
   </header>
 
+  <section class="hero">
+    <div class="hero-label">Можно потратить сегодня</div>
+    <div class="hero-value" id="heroDaily">—</div>
+    <div class="hero-sub" id="heroSub">—</div>
+    <div class="hero-detail" id="heroDetail">—</div>
+  </section>
+
   <div class="stats">
     <div class="stat"><div class="lbl">Доход · месяц</div><div class="val pos" id="statIncome">0 ₽</div></div>
     <div class="stat"><div class="lbl">Расходы · месяц</div><div class="val neg" id="statExpense">0 ₽</div></div>
@@ -204,17 +241,8 @@
     <div class="stat"><div class="lbl">Норма накопления</div><div class="val gold" id="statRate">0%</div></div>
   </div>
 
-  <section id="paydaySection">
-    <h2>До зарплаты</h2>
-    <div class="hint" id="paydayHint">—</div>
-    <div class="stats" style="grid-template-columns:1fr 1fr;margin:0;">
-      <div class="stat" style="background:var(--surface-2);"><div class="lbl">Дней осталось</div><div class="val gold" id="paydayDays">—</div></div>
-      <div class="stat" style="background:var(--surface-2);"><div class="lbl">Можно тратить в день</div><div class="val" id="paydayDaily">—</div></div>
-    </div>
-  </section>
-
   <section>
-    <h2>Добавить запись</h2>
+    <h2>Добавить запись <span class="sync-badge" id="syncBadge"><span class="sync-dot" id="syncDot"></span><span id="syncText">проверка…</span></span></h2>
     <div class="hint">Одна строка — одна операция. Остальное посчитается само.</div>
     <form id="txForm">
       <div class="type-toggle">
@@ -238,33 +266,10 @@
   </section>
 
   <section>
-    <h2>Месяц <select id="monthSelect" style="width:auto;display:inline-block;padding:4px 8px;font-size:12.5px;"></select></h2>
-    <div class="hint">Расходы по категориям</div>
-    <div class="chart-box"><canvas id="catChart"></canvas></div>
-  </section>
-
-  <section>
-    <h2>Динамика за год</h2>
-    <div class="hint">Доход, расходы и накопления по месяцам</div>
-    <div class="chart-box"><canvas id="trendChart"></canvas></div>
-  </section>
-
-  <section>
-    <h2>Траты по типу дня</h2>
-    <div class="hint">Где утекает больше — в ночь, в день или на выходных</div>
-    <div class="chart-box" style="height:190px;"><canvas id="shiftChart"></canvas></div>
-  </section>
-
-  <section>
-    <h2>Если бы не сигареты</h2>
-    <div class="hint" id="cigHint">—</div>
-    <div class="bar"><div class="bar-fill" id="cigBar" style="width:0%;background:linear-gradient(90deg,var(--rust),#c98b5f);"></div></div>
-  </section>
-
-  <section>
     <h2>Контроль лимитов</h2>
     <div class="hint">Заполняется от края к краю по мере трат в этом месяце</div>
     <div class="coins" id="coinsBox"></div>
+    <div class="hint" id="cigNote" style="margin-top:12px;margin-bottom:0;"></div>
   </section>
 
   <section>
@@ -284,13 +289,33 @@
     <div class="tx-list" id="txList"></div>
   </section>
 
+  <div class="analytics-label">Аналитика</div>
+
+  <section>
+    <h2>Месяц <select id="monthSelect" style="width:auto;display:inline-block;padding:4px 8px;font-size:12.5px;"></select></h2>
+    <div class="hint">Расходы по категориям</div>
+    <div class="chart-box"><canvas id="catChart"></canvas></div>
+  </section>
+
+  <section>
+    <h2>Динамика за год</h2>
+    <div class="hint">Доход, расходы и накопления по месяцам</div>
+    <div class="chart-box"><canvas id="trendChart"></canvas></div>
+  </section>
+
+  <section>
+    <h2>Траты по типу дня</h2>
+    <div class="hint">Где утекает больше — в ночь, в день или на выходных</div>
+    <div class="chart-box" style="height:190px;"><canvas id="shiftChart"></canvas></div>
+  </section>
+
   <section>
     <h2>Отчёт месяца</h2>
     <div class="hint">Скопировать сводку — можно скинуть себе в Телеграм</div>
     <button class="submit-btn" id="copyReportBtn" style="background:var(--surface-2);color:var(--text);border:1px solid var(--line);">Скопировать отчёт</button>
   </section>
 
-  <footer>ДАННЫЕ ПРИВЯЗАНЫ К ТВОЕМУ АККАУНТУ CLAUDE — ОТКРОЕШЬ С ЛЮБОГО УСТРОЙСТВА</footer>
+  <footer>ДАННЫЕ ХРАНЯТСЯ В SUPABASE — ОТКРОЕШЬ С ЛЮБОГО УСТРОЙСТВА</footer>
 </div>
 
 <script>
@@ -327,17 +352,30 @@ let txs = [];
 let currentType = "Расход";
 let catChart, trendChart, shiftChart;
 const PAYDAYS = [10, 25];
+let cloudOnline = null;
+let editingId = null;
 
 function fmt(n){ return Math.round(n).toLocaleString('ru-RU') + ' ₽'; }
+
+function setSyncStatus(online){
+  cloudOnline = online;
+  const dot = document.getElementById('syncDot');
+  const text = document.getElementById('syncText');
+  if(!dot || !text) return;
+  dot.className = 'sync-dot ' + (online ? 'online' : 'offline');
+  text.textContent = online ? 'в облаке' : 'только локально';
+}
 
 async function loadTxs(){
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?select=*&order=date.desc`, { headers: SB_HEADERS });
     if(!res.ok) throw new Error('HTTP '+res.status);
     txs = await res.json();
+    setSyncStatus(true);
     return;
   }catch(e){
     console.error('Supabase недоступен, читаю локальный кэш:', e);
+    setSyncStatus(false);
   }
   try{
     const local = localStorage.getItem(STORE_KEY);
@@ -360,10 +398,35 @@ async function insertTx(tx){
       throw new Error(lastInsertError);
     }
     const rows = await res.json();
+    setSyncStatus(true);
     return rows[0];
   }catch(e){
     if(!lastInsertError) lastInsertError = e.message || String(e);
     console.error('Не удалось сохранить в Supabase:', e);
+    setSyncStatus(false);
+    return null;
+  }
+}
+
+async function updateTxRemote(id, tx){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
+      body: JSON.stringify(tx)
+    });
+    if(!res.ok){
+      const bodyText = await res.text();
+      lastInsertError = `HTTP ${res.status}: ${bodyText.slice(0,120)}`;
+      throw new Error(lastInsertError);
+    }
+    const rows = await res.json();
+    setSyncStatus(true);
+    return rows[0];
+  }catch(e){
+    if(!lastInsertError) lastInsertError = e.message || String(e);
+    console.error('Не удалось обновить в Supabase:', e);
+    setSyncStatus(false);
     return null;
   }
 }
@@ -371,6 +434,7 @@ async function insertTx(tx){
 async function deleteTxRemote(id){
   try{
     const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?id=eq.${id}`, { method:'DELETE', headers: SB_HEADERS });
+    setSyncStatus(res.ok);
     return res.ok;
   }catch(e){
     console.error('Не удалось удалить из Supabase:', e);
@@ -479,11 +543,18 @@ function renderPayday(monthTxs, expenseSoFar){
   const pool = Math.max(0, monthLimit - discretionaryExpense - goalReserveLeft - obligReserveLeft - debtReserveLeft);
   const dailyAllowance = pool / daysLeft;
 
-  document.getElementById('paydayHint').textContent =
-    `Следующая получка — ${paydayDate.toLocaleDateString('ru-RU', {day:'2-digit', month:'long'})}. `
-    + `Из ${fmt(monthLimit)} на прочие траты отложено: ${fmt(goalReserveLeft)} на цели, ${fmt(obligReserveLeft)} на обязательные платежи, ${fmt(debtReserveLeft)} на долг.`;
-  document.getElementById('paydayDays').textContent = daysLeft;
-  document.getElementById('paydayDaily').textContent = fmt(dailyAllowance);
+  document.getElementById('heroDaily').textContent = fmt(dailyAllowance);
+  document.getElementById('heroSub').textContent =
+    `${daysLeft} ${daysWord(daysLeft)} до зарплаты (${paydayDate.toLocaleDateString('ru-RU', {day:'2-digit', month:'long'})})`;
+  document.getElementById('heroDetail').textContent =
+    `Из ${fmt(monthLimit)} на прочие траты отложено: ${fmt(goalReserveLeft)} на цели, ${fmt(obligReserveLeft)} на обязательные платежи, ${fmt(debtReserveLeft)} на долг.`;
+}
+
+function daysWord(n){
+  const mod10 = n % 10, mod100 = n % 100;
+  if(mod10===1 && mod100!==11) return 'день';
+  if([2,3,4].includes(mod10) && ![12,13,14].includes(mod100)) return 'дня';
+  return 'дней';
 }
 
 function renderShiftChart(monthTxs){
@@ -513,16 +584,14 @@ function renderShiftChart(monthTxs){
 
 function renderCigInsight(monthTxs){
   const cig = monthTxs.filter(t=>t.type==='Расход' && t.category==='Сигареты').reduce((s,t)=>s+t.amount,0);
+  const note = document.getElementById('cigNote');
   if(cig === 0){
-    document.getElementById('cigHint').textContent = 'В этом месяце трат на сигареты не отмечено.';
-    document.getElementById('cigBar').style.width = '0%';
+    note.textContent = '';
     return;
   }
   const rights = GOALS.find(g=>g.keyword==='права');
   const pctOfGoal = rights ? Math.min(100, Math.round(cig/rights.target*100)) : 0;
-  document.getElementById('cigHint').textContent =
-    `${fmt(cig)} за месяц. Это ${pctOfGoal}% от цели «Водительские права», если перекинуть туда.`;
-  document.getElementById('cigBar').style.width = Math.min(100, cig/10000*100) + '%';
+  note.textContent = `Из них на сигареты: ${fmt(cig)} — это ${pctOfGoal}% от цели «Права», если бы перекинуть туда.`;
 }
 
 function buildReport(){
@@ -684,6 +753,7 @@ function renderTxList(){
       </div>
       <div style="display:flex;align-items:center;">
         <span class="tx-amt ${t.type==='Расход'?'exp':'inc'}">${t.type==='Расход'?'−':'+'}${fmt(t.amount)}</span>
+        <button class="tx-edit" data-id="${t.id}" aria-label="Изменить">✎</button>
         <button class="tx-del" data-id="${t.id}" aria-label="Удалить">✕</button>
       </div>
     `;
@@ -700,6 +770,27 @@ function renderTxList(){
         persistLocalCache();
         render();
       }
+    });
+  });
+  box.querySelectorAll('.tx-edit').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const raw = btn.dataset.id;
+      const tx = txs.find(t => String(t.id) === String(raw));
+      if(!tx) return;
+      editingId = tx.id;
+      currentType = tx.type;
+      document.querySelectorAll('.type-toggle button').forEach(b=>{
+        b.classList.toggle('active', b.dataset.type === tx.type);
+      });
+      populateCategorySelect();
+      document.getElementById('txDate').value = tx.date;
+      document.getElementById('txAmount').value = tx.amount;
+      document.getElementById('txCategory').value = tx.category;
+      document.getElementById('txShift').value = tx.shift || '';
+      document.getElementById('txComment').value = tx.comment || '';
+      const submitBtn = document.querySelector('#txForm .submit-btn');
+      submitBtn.textContent = 'Сохранить изменения';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   });
 }
@@ -722,28 +813,49 @@ document.getElementById('txForm').addEventListener('submit', async (e)=>{
   const comment = document.getElementById('txComment').value.trim();
   if(!date || !amount) return;
 
-  const newTx = { date, type: currentType, category, amount, comment, shift };
+  const txData = { date, type: currentType, category, amount, comment, shift };
   lastInsertError = '';
-  const inserted = await insertTx(newTx);
+  const submitBtn = e.target.querySelector('.submit-btn');
 
-  if(inserted){
-    txs.push(inserted);
+  if(editingId !== null){
+    const isLocal = String(editingId).startsWith('local-');
+    if(isLocal){
+      const idx = txs.findIndex(t => String(t.id) === String(editingId));
+      if(idx !== -1) txs[idx] = { ...txs[idx], ...txData };
+      persistLocalCache();
+    } else {
+      const updated = await updateTxRemote(editingId, txData);
+      if(updated){
+        const idx = txs.findIndex(t => String(t.id) === String(editingId));
+        if(idx !== -1) txs[idx] = updated;
+      } else {
+        const idx = txs.findIndex(t => String(t.id) === String(editingId));
+        if(idx !== -1) txs[idx] = { ...txs[idx], ...txData };
+      }
+      persistLocalCache();
+    }
+    editingId = null;
+    submitBtn.textContent = 'Добавить';
   } else {
-    newTx.id = 'local-' + Date.now();
-    txs.push(newTx);
+    const inserted = await insertTx(txData);
+    if(inserted){
+      txs.push(inserted);
+    } else {
+      txs.push({ ...txData, id: 'local-' + Date.now() });
+    }
+    persistLocalCache();
   }
-  persistLocalCache();
 
   document.getElementById('txAmount').value = '';
   document.getElementById('txComment').value = '';
   document.getElementById('txShift').value = '';
+  document.getElementById('txDate').valueAsDate = new Date();
   render();
 
-  if(!inserted){
-    const btn = e.target.querySelector('.submit-btn');
-    const original = btn.textContent;
-    btn.textContent = 'Сохранено локально. Ошибка облака: ' + lastInsertError;
-    setTimeout(()=>{ btn.textContent = original; }, 5000);
+  if(lastInsertError){
+    const original = submitBtn.textContent;
+    submitBtn.textContent = 'Сохранено локально. Ошибка облака: ' + lastInsertError;
+    setTimeout(()=>{ submitBtn.textContent = original; }, 5000);
   }
 });
 
