@@ -12,8 +12,8 @@ android {
         applicationId = "ru.kopeyka.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -21,6 +21,20 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/kopeykaWeb"))
+}
+
+val prepareKopeykaWeb = tasks.register<Copy>("prepareKopeykaWeb") {
+    val repoRoot = rootProject.projectDir.parentFile
+    from(repoRoot) {
+        include("index.html", "app.js", "manifest.json", "sw.js", "icon-192.png")
+    }
+    into(layout.buildDirectory.dir("generated/kopeykaWeb"))
+}
+
+tasks.named("preBuild") {
+    dependsOn(prepareKopeykaWeb)
 }
 
 dependencies {
