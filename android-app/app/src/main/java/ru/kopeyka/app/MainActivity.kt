@@ -1,6 +1,7 @@
 package ru.kopeyka.app
 
 import android.app.DatePickerDialog
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,14 +21,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import ru.kopeyka.app.data.KopeykaDatabase
 import ru.kopeyka.app.data.Transaction
@@ -45,8 +47,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun OfflineHome(repository: TransactionRepository) {
-    val rows by repository.transactions.collectAsStateWithLifecycle()
+    val rows by repository.transactions.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var amountText by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("Расход") }
     var category by remember { mutableStateOf("Другое") }
@@ -74,9 +77,11 @@ private fun OfflineHome(repository: TransactionRepository) {
             Text("Запланировано: +${plannedIncome.formatRub()} ₽ доходов · -${plannedExpense.formatRub()} ₽ расходов")
         }
 
-        OutlinedButton(onClick = { type = "Расход" }) { Text(if (type == "Расход") "✓ Расход" else "Расход") }
-        OutlinedButton(onClick = { type = "Доход" }) { Text(if (type == "Доход") "✓ Доход" else "Доход") }
-        OutlinedButton(onClick = { type = "Накопление" }) { Text(if (type == "Накопление") "✓ Накопление" else "Накопление") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { type = "Расход" }) { Text(if (type == "Расход") "✓ Расход" else "Расход") }
+            OutlinedButton(onClick = { type = "Доход" }) { Text(if (type == "Доход") "✓ Доход" else "Доход") }
+            OutlinedButton(onClick = { type = "Накопление" }) { Text(if (type == "Накопление") "✓ Накопление" else "Накопление") }
+        }
 
         OutlinedTextField(
             value = amountText,
@@ -96,13 +101,9 @@ private fun OfflineHome(repository: TransactionRepository) {
             label = { Text("Комментарий") },
             modifier = Modifier.fillMaxWidth()
         )
-        Button(onClick = {
-            DatePickerDialog(
-                (androidx.compose.ui.platform.LocalContext.current),
-                { _, y, m, d -> date = LocalDate.of(y, m + 1, d) },
-                date.year, date.monthValue - 1, date.dayOfMonth
-            ).show()
-        }) { Text("Дата: $date") }
+        Button(onClick = { showDatePicker(context, date) { date = it } }) {
+            Text("Дата: $date")
+        }
 
         Button(
             enabled = amountText.toLongOrNull()?.let { it > 0 } == true,
@@ -116,9 +117,21 @@ private fun OfflineHome(repository: TransactionRepository) {
         ) { Text("Сохранить локально") }
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(rows, key = { it.id }) { item -> TransactionCard(item) { scope.launch { repository.delete(item.id) } } }
+            items(rows, key = { it.id }) { item ->
+                TransactionCard(item) { scope.launch { repository.delete(item.id) } }
+            }
         }
     }
+}
+
+private fun showDatePicker(context: Context, current: LocalDate, onSelected: (LocalDate) -> Unit) {
+    DatePickerDialog(
+        context,
+        { _, y, m, d -> onSelected(LocalDate.of(y, m + 1, d)) },
+        current.year,
+        current.monthValue - 1,
+        current.dayOfMonth
+    ).show()
 }
 
 @Composable
