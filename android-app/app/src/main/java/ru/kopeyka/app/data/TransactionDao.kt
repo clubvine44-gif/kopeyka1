@@ -3,6 +3,7 @@ package ru.kopeyka.app.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -15,6 +16,12 @@ interface TransactionDao {
 
     @Insert
     suspend fun insert(transaction: Transaction): Long
+
+    @Update
+    suspend fun update(transaction: Transaction)
+
+    @Query("UPDATE transactions SET syncState = :state WHERE id = :id")
+    suspend fun setSyncState(id: Long, state: String)
 
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun delete(id: Long)
