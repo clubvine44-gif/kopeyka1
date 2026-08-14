@@ -5,6 +5,7 @@ on:
     branches: [android-offline]
   pull_request:
     branches: [android-offline]
+  workflow_dispatch:
 
 jobs:
   build:
