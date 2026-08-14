@@ -14,6 +14,7 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         webView = WebView(this)
         setContentView(webView)
 
@@ -31,21 +32,28 @@ class MainActivity : Activity() {
             loadWithOverviewMode = false
         }
 
+        // Do not let an old WebView HTTP cache hide a newly bundled UI.
+        // This does not clear localStorage/IndexedDB, so financial data remains intact.
+        webView.clearCache(true)
+
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : android.webkit.WebViewClient() {
-            override fun shouldInterceptRequest(view: WebView, request: android.webkit.WebResourceRequest) =
-                assetLoader.shouldInterceptRequest(request.url)
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: android.webkit.WebResourceRequest
+            ) = assetLoader.shouldInterceptRequest(request.url)
         }
 
-        // Production Kopeyka UI is bundled into the APK. It can open without internet;
-        // localStorage remains available and the web app synchronizes with Supabase when online.
+        // The complete Kopeyka web UI is bundled in the APK.
+        // No network connection is required to open the interface or use local data.
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
