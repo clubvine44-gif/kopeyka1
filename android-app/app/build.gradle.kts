@@ -8,24 +8,18 @@ plugins {
 android {
     namespace = "ru.kopeyka.app"
     compileSdk = 35
-
     defaultConfig {
         applicationId = "ru.kopeyka.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0.1"
+        versionName = "1.0.2"
     }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
+    kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
 }
 
@@ -43,4 +37,5 @@ dependencies {
     implementation("androidx.room:room-ktx:2.7.0")
     ksp("androidx.room:room-compiler:2.7.0")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
+    implementation("androidx.webkit:webkit:1.12.1")
 }

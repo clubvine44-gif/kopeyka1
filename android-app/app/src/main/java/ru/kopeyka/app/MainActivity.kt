@@ -4,11 +4,9 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.os.Bundle
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
-import android.webkit.WebViewClient
+import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
@@ -23,8 +21,8 @@ class MainActivity : Activity() {
             javaScriptEnabled = true
             domStorageEnabled = true
             databaseEnabled = true
-            allowFileAccess = true
-            allowContentAccess = true
+            allowFileAccess = false
+            allowContentAccess = false
             cacheMode = WebSettings.LOAD_DEFAULT
             builtInZoomControls = false
             displayZoomControls = false
@@ -33,16 +31,19 @@ class MainActivity : Activity() {
             loadWithOverviewMode = false
         }
 
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
         webView.webChromeClient = WebChromeClient()
-        webView.webViewClient = object : WebViewClient() {
-            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-                return super.shouldInterceptRequest(view, request)
-            }
+        webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: android.webkit.WebResourceRequest) =
+                assetLoader.shouldInterceptRequest(request.url)
         }
 
-        // The Android build uses the same production Kopeyka interface as the web app.
-        // WebView keeps its DOM/localStorage locally, while Supabase is used when online.
-        webView.loadUrl("https://clubvine44-gif.github.io/kopeyka1/")
+        // Production Kopeyka UI is bundled into the APK. It can open without internet;
+        // localStorage remains available and the web app synchronizes with Supabase when online.
+        webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
     }
 
     override fun onBackPressed() {
