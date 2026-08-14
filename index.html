@@ -182,8 +182,11 @@
     font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;
     text-transform:uppercase;color:var(--gold-dim);margin-bottom:8px;
   }
-  .hero-value{font-family:'Fraunces',serif;font-weight:700;font-size:46px;color:var(--gold);line-height:1;}
+  .hero-value{font-family:'Fraunces',serif;font-weight:700;font-size:38px;color:var(--gold);line-height:1;}
   .hero-value.zero{color:var(--rust);}
+  .hero-value.alt{color:var(--mint);font-size:30px;}
+  .hero-split{display:flex;justify-content:center;gap:22px;align-items:flex-end;}
+  .hero-col{display:flex;flex-direction:column;align-items:center;}
   .hero-sub{color:var(--muted);font-size:13px;margin-top:8px;}
   .hero-detail{color:var(--faint);font-size:11.5px;margin-top:6px;}
   .hero-warn{color:var(--rust);font-size:12.5px;font-weight:600;margin-top:10px;}
@@ -263,10 +266,19 @@
     </header>
 
     <section class="hero">
-      <div class="hero-label">Можно потратить сегодня</div>
-      <div class="hero-value" id="heroDaily">—</div>
+      <div class="hero-split">
+        <div class="hero-col">
+          <div class="hero-label">С резервами</div>
+          <div class="hero-value" id="heroDailySafe">—</div>
+        </div>
+        <div class="hero-col">
+          <div class="hero-label">Без резервов</div>
+          <div class="hero-value alt" id="heroDailyFree">—</div>
+        </div>
+      </div>
       <div class="hero-sub" id="heroSub">—</div>
       <div class="hero-warn" id="heroWarn" style="display:none;"></div>
+      <div class="hero-warn" id="plannedNote" style="display:none;color:var(--gold);"></div>
       <div class="reserves" id="heroReserves"></div>
     </section>
 
@@ -319,10 +331,15 @@
         <span class="nav-label">Аналитика</span>
         <span class="nav-sub">Графики и тренды</span>
       </button>
-      <button class="nav-card" data-goto="report" style="grid-column:1 / -1;">
+      <button class="nav-card" data-goto="report">
         <span class="nav-icon">🧾</span>
-        <span class="nav-label">Отчёт месяца</span>
-        <span class="nav-sub">Скопировать сводку в Телеграм</span>
+        <span class="nav-label">Отчёты</span>
+        <span class="nav-sub">По каждому месяцу</span>
+      </button>
+      <button class="nav-card" data-goto="settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Настройки</span>
+        <span class="nav-sub">Платежи, «должен», планы</span>
       </button>
     </div>
 
@@ -347,6 +364,42 @@
       <div class="plan-list" id="planList"></div>
       <div class="budget-rows" id="budgetList" style="margin-top:18px;"></div>
       <div class="hint" id="cigNote" style="margin-top:10px;margin-bottom:0;"></div>
+      <button type="button" class="submit-btn" data-goto="settings" style="margin-top:14px;background:var(--surface-2);color:var(--text);border:1px solid var(--line);">Изменить суммы обязательных платежей</button>
+    </section>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <div class="page" id="page-settings">
+    <div class="page-header">
+      <button class="page-back" data-back>← Назад</button>
+      <h1>Настройки</h1>
+    </div>
+
+    <section>
+      <h2>Обязательные платежи</h2>
+      <div class="hint">Измени суммы под свою реальную ситуацию — они сразу учтутся в расчётах.</div>
+      <div id="obligList" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <button type="button" class="submit-btn" id="obligAddBtn" style="margin-top:10px;background:var(--surface-2);color:var(--text);border:1px solid var(--line);">+ Добавить платёж</button>
+      <button type="button" class="submit-btn" id="obligSaveBtn" style="margin-top:8px;">Сохранить платежи</button>
+      <div class="hint" id="obligSaveStatus" style="margin-top:6px;margin-bottom:0;"></div>
+    </section>
+
+    <section>
+      <h2>«Должен» и «Плановая трата»</h2>
+      <div class="hint">Обе учитываются в значении «С резервами» до указанной даты платежа, пока не отмечены оплаченными.</div>
+      <form id="planForm">
+        <div class="type-toggle">
+          <button type="button" data-kind="Плановая трата" class="active">Плановая трата</button>
+          <button type="button" data-kind="Должен">Должен</button>
+        </div>
+        <input type="text" id="planName" placeholder="Название (кому/за что)" required>
+        <div class="row2">
+          <input type="number" id="planAmount" placeholder="Сумма, ₽" required min="0">
+          <input type="date" id="planDate" required>
+        </div>
+        <button type="submit" class="submit-btn">Добавить</button>
+      </form>
+      <div id="planList2" style="margin-top:14px;display:flex;flex-direction:column;gap:0;"></div>
     </section>
   </div>
 
@@ -409,701 +462,18 @@
   <div class="page" id="page-report">
     <div class="page-header">
       <button class="page-back" data-back>← Назад</button>
-      <h1>Отчёт месяца</h1>
+      <h1>Отчёты по месяцам</h1>
     </div>
 
     <section>
+      <h2>Месяц <select id="reportMonthSelect" style="width:auto;display:inline-block;padding:4px 8px;font-size:12.5px;"></select></h2>
+      <pre id="reportPreview" style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--text);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0;">—</pre>
       <button class="submit-btn" id="copyReportBtn" style="background:var(--surface-2);color:var(--text);border:1px solid var(--line);">Скопировать отчёт</button>
     </section>
   </div>
 
 </div>
 
-<script>
-const EXP_CATEGORIES = ["Еда","Сигареты","Алкоголь","Транспорт","Жильё","Обязательные платежи","Долг","Связь","Здоровье","Развлечения","Другое"];
-const INC_CATEGORIES = ["Зарплата","Подработка","Накопление","Прочее"];
-const MONTHLY_INCOME = 98000;
-const LIMITS = [
-  {name:"Прочие траты", limit:25300, exclude:["Обязательные платежи","Долг","Сигареты","Алкоголь"]},
-  {name:"Пиво и сигареты", limit:10000, match:["Сигареты","Алкоголь"]},
-];
-const OBLIGATIONS = [
-  {name:"Алименты", amount:25000},
-  {name:"Коммуналка + продукты", amount:8000},
-  {name:"Связь + VPN", amount:700},
-  {name:"Подписка Claude", amount:2000},
-];
-const OBLIGATIONS_TOTAL = OBLIGATIONS.reduce((s,o)=>s+o.amount,0);
-const OBLIGATIONS_DAY = 25;
-const DEBT = { total:70000, monthly:15000, category:"Долг" };
-const GOALS = [
-  {name:"Финансовая подушка", target:300000, monthly:5000, keyword:"подушк", priority:"Высокий"},
-  {name:"Водительские права", target:100000, monthly:4000, keyword:"права", priority:"Высокий"},
-  {name:"Автомобиль", target:250000, monthly:2000, keyword:"авто", priority:"Средний"},
-  {name:"Переезд", target:60000, monthly:1000, keyword:"переезд", priority:"Средний"},
-  {name:"Капитал", target:500000, monthly:0, keyword:"капитал", priority:"На паузе (пока не закрыт долг)"},
-];
-const MONTHS = ["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];
-const STORE_KEY = "kopeyka:transactions";
-const SUPABASE_URL = "https://cqslrfphsjllhltsvvuq.supabase.co";
-const SUPABASE_KEY = "sb_publishable_cM_XCycYRFLIc6qEqlH83Q_5XY6kPzG";
-const SB_HEADERS = { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" };
-
-let txs = [];
-let currentType = "Расход";
-let catChart, trendChart, shiftChart;
-const PAYDAYS = [10, 25];
-let cloudOnline = null;
-let editingId = null;
-
-function fmt(n){ return Math.round(n).toLocaleString('ru-RU') + ' ₽'; }
-
-function setSyncStatus(online){
-  cloudOnline = online;
-  const dot = document.getElementById('syncDot');
-  const text = document.getElementById('syncText');
-  if(!dot || !text) return;
-  dot.className = 'sync-dot ' + (online ? 'online' : 'offline');
-  text.textContent = online ? 'в облаке' : 'только локально';
-}
-
-async function loadTxs(){
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?select=*&order=date.desc`, { headers: SB_HEADERS });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    txs = await res.json();
-    setSyncStatus(true);
-    return;
-  }catch(e){
-    console.error('Supabase недоступен, читаю локальный кэш:', e);
-    setSyncStatus(false);
-  }
-  try{
-    const local = localStorage.getItem(STORE_KEY);
-    txs = local ? JSON.parse(local) : [];
-  }catch(e){ txs = []; }
-}
-
-let lastInsertError = '';
-
-async function insertTx(tx){
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions`, {
-      method: 'POST',
-      headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
-      body: JSON.stringify(tx)
-    });
-    if(!res.ok){
-      const bodyText = await res.text();
-      lastInsertError = `HTTP ${res.status}: ${bodyText.slice(0,120)}`;
-      throw new Error(lastInsertError);
-    }
-    const rows = await res.json();
-    setSyncStatus(true);
-    return rows[0];
-  }catch(e){
-    if(!lastInsertError) lastInsertError = e.message || String(e);
-    console.error('Не удалось сохранить в Supabase:', e);
-    setSyncStatus(false);
-    return null;
-  }
-}
-
-async function updateTxRemote(id, tx){
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?id=eq.${id}`, {
-      method: 'PATCH',
-      headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
-      body: JSON.stringify(tx)
-    });
-    if(!res.ok){
-      const bodyText = await res.text();
-      lastInsertError = `HTTP ${res.status}: ${bodyText.slice(0,120)}`;
-      throw new Error(lastInsertError);
-    }
-    const rows = await res.json();
-    setSyncStatus(true);
-    return rows[0];
-  }catch(e){
-    if(!lastInsertError) lastInsertError = e.message || String(e);
-    console.error('Не удалось обновить в Supabase:', e);
-    setSyncStatus(false);
-    return null;
-  }
-}
-
-async function deleteTxRemote(id){
-  try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?id=eq.${id}`, { method:'DELETE', headers: SB_HEADERS });
-    setSyncStatus(res.ok);
-    return res.ok;
-  }catch(e){
-    console.error('Не удалось удалить из Supabase:', e);
-    return false;
-  }
-}
-
-function persistLocalCache(){
-  try{ localStorage.setItem(STORE_KEY, JSON.stringify(txs)); }catch(e){}
-}
-
-function safeCall(fn){
-  try{ fn(); }catch(e){ console.error('Ошибка отрисовки:', e); }
-}
-
-function populateCategorySelect(){
-  const sel = document.getElementById('txCategory');
-  sel.innerHTML = '';
-  const list = currentType === 'Расход' ? EXP_CATEGORIES : INC_CATEGORIES;
-  list.forEach(c=>{
-    const o = document.createElement('option');
-    o.value = c; o.textContent = c;
-    sel.appendChild(o);
-  });
-}
-
-function setupMonthSelect(){
-  const sel = document.getElementById('monthSelect');
-  const now = new Date();
-  MONTHS.forEach((m,i)=>{
-    const o = document.createElement('option');
-    o.value = i; o.textContent = m;
-    if(i === now.getMonth()) o.selected = true;
-    sel.appendChild(o);
-  });
-  sel.addEventListener('change', render);
-}
-
-function currentYear(){ return new Date().getFullYear(); }
-
-function txsForMonth(monthIdx){
-  const y = currentYear();
-  return txs.filter(t=>{
-    const d = new Date(t.date);
-    return d.getMonth() === monthIdx && d.getFullYear() === y;
-  });
-}
-
-function render(){
-  const monthIdx = parseInt(document.getElementById('monthSelect').value);
-  const monthTxs = txsForMonth(monthIdx);
-
-  const income = monthTxs.filter(t=>t.type==='Доход' && t.category!=='Накопление').reduce((s,t)=>s+t.amount,0);
-  const savingsIncome = monthTxs.filter(t=>t.type==='Доход' && t.category==='Накопление').reduce((s,t)=>s+t.amount,0);
-  const expense = monthTxs.filter(t=>t.type==='Расход').reduce((s,t)=>s+t.amount,0);
-  const remain = income - expense - savingsIncome;
-  const rate = income > 0 ? (savingsIncome/income*100) : 0;
-
-  document.getElementById('statIncome').textContent = fmt(income);
-  document.getElementById('statExpense').textContent = fmt(expense);
-  const remainEl = document.getElementById('statRemain');
-  remainEl.textContent = fmt(remain);
-  remainEl.className = 'val ' + (remain >= 0 ? 'pos' : 'neg');
-  document.getElementById('statRate').textContent = Math.round(rate) + '%';
-
-  safeCall(()=>renderCatChart(monthTxs));
-  safeCall(()=>renderTrendChart());
-  safeCall(()=>renderBudgetSection(monthTxs));
-  safeCall(()=>renderDebt(monthTxs));
-  safeCall(()=>renderDebtHistory());
-  safeCall(()=>renderGoals());
-  safeCall(()=>renderTxList());
-  safeCall(()=>renderPayday(monthTxs, expense));
-  safeCall(()=>renderShiftChart(monthTxs));
-  safeCall(()=>renderCigInsight(monthTxs));
-}
-
-function renderPayday(monthTxs, expenseSoFar){
-  const today = new Date();
-  const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
-  let nextPayday = PAYDAYS.find(p => p > d);
-  let paydayDate;
-  if(nextPayday){
-    paydayDate = new Date(y, m, nextPayday);
-  } else {
-    paydayDate = new Date(y, m+1, PAYDAYS[0]);
-  }
-  const msPerDay = 1000*60*60*24;
-  const daysLeft = Math.max(1, Math.ceil((paydayDate - today) / msPerDay));
-
-  const otherLimitDef = LIMITS.find(l=>l.name==='Прочие траты');
-  const monthLimit = otherLimitDef.limit;
-  const discretionaryExpense = monthTxs.filter(t=>t.type==='Расход' && !otherLimitDef.exclude.includes(t.category)).reduce((s,t)=>s+t.amount,0);
-
-  const totalGoalMonthly = GOALS.reduce((s,g)=>s+g.monthly, 0);
-  const savedThisMonth = monthTxs.filter(t=>t.type==='Доход' && t.category==='Накопление').reduce((s,t)=>s+t.amount,0);
-  const goalReserveLeft = Math.max(0, totalGoalMonthly - savedThisMonth);
-
-  const obligPaid = monthTxs.filter(t=>t.type==='Расход' && t.category==='Обязательные платежи').reduce((s,t)=>s+t.amount,0);
-  const obligReserveLeft = (d < OBLIGATIONS_DAY) ? Math.max(0, OBLIGATIONS_TOTAL - obligPaid) : 0;
-
-  const debtPaidThisMonth = monthTxs.filter(t=>t.type==='Расход' && t.category===DEBT.category).reduce((s,t)=>s+t.amount,0);
-  const debtRemainingTotal = DEBT.total - txs.filter(t=>t.type==='Расход' && t.category===DEBT.category).reduce((s,t)=>s+t.amount,0);
-  const debtReserveLeft = debtRemainingTotal > 0 ? Math.max(0, Math.min(DEBT.monthly, debtRemainingTotal) - debtPaidThisMonth) : 0;
-
-  const pool = Math.max(0, monthLimit - discretionaryExpense - goalReserveLeft - obligReserveLeft - debtReserveLeft);
-  const dailyAllowance = pool / daysLeft;
-
-  document.getElementById('heroDaily').textContent = fmt(dailyAllowance);
-  document.getElementById('heroDaily').className = 'hero-value' + (dailyAllowance <= 0 ? ' zero' : '');
-  document.getElementById('heroSub').textContent =
-    `${daysLeft} ${daysWord(daysLeft)} до зарплаты (${paydayDate.toLocaleDateString('ru-RU', {day:'2-digit', month:'long'})})`;
-
-  const warnEl = document.getElementById('heroWarn');
-  if(dailyAllowance <= 0){
-    warnEl.style.display = 'block';
-    warnEl.textContent = 'Свободных денег на прочее пока нет — сначала закрой резервы ниже';
-  } else {
-    warnEl.style.display = 'none';
-  }
-
-  const reserveItems = [
-    { name:'Цели', left: goalReserveLeft },
-    { name:'Обязательные платежи', left: obligReserveLeft },
-    { name:'Долг (в этом месяце)', left: debtReserveLeft },
-  ];
-  const resBox = document.getElementById('heroReserves');
-  resBox.innerHTML = reserveItems.map(it => `
-    <div class="reserve-row">
-      <div class="reserve-status">
-        <span class="reserve-dot ${it.left === 0 ? 'done' : 'pending'}"></span>
-        <span>${it.name}</span>
-      </div>
-      <span class="reserve-amt ${it.left === 0 ? 'done' : ''}">${it.left === 0 ? 'закрыто ✓' : 'осталось ' + fmt(it.left)}</span>
-    </div>
-  `).join('');
-}
-
-function renderBudgetPlan(){
-  const items = [
-    { name:'Обязательные платежи', amount: OBLIGATIONS_TOTAL, color:'#d9614f' },
-    { name:'Долг', amount: DEBT.monthly, color:'#c98b5f' },
-    { name:'Цели (накопления)', amount: GOALS.reduce((s,g)=>s+g.monthly,0), color:'#d4af37' },
-    { name:'Пиво и сигареты', amount: 10000, color:'#7a8fbf' },
-    { name:'Прочие траты', amount: LIMITS.find(l=>l.name==='Прочие траты').limit, color:'#5fbca5' },
-  ];
-  const bar = document.getElementById('planBar');
-  const list = document.getElementById('planList');
-  if(!bar || !list) return;
-  bar.innerHTML = '';
-  list.innerHTML = '';
-  items.forEach(it=>{
-    const pct = (it.amount / MONTHLY_INCOME * 100);
-    const seg = document.createElement('div');
-    seg.className = 'stackbar-seg';
-    seg.style.width = pct + '%';
-    seg.style.background = it.color;
-    bar.appendChild(seg);
-
-    const row = document.createElement('div');
-    row.className = 'plan-item';
-    row.innerHTML = `
-      <div class="plan-dot" style="background:${it.color}"></div>
-      <div class="plan-name">${it.name}</div>
-      <div class="plan-amt">${fmt(it.amount)}</div>
-      <div class="plan-pct">${Math.round(pct)}%</div>
-    `;
-    list.appendChild(row);
-  });
-}
-
-function daysWord(n){
-  const mod10 = n % 10, mod100 = n % 100;
-  if(mod10===1 && mod100!==11) return 'день';
-  if([2,3,4].includes(mod10) && ![12,13,14].includes(mod100)) return 'дня';
-  return 'дней';
-}
-
-function renderShiftChart(monthTxs){
-  const groups = {'Ночь':0, 'День':0, 'Выходной':0, 'Не указано':0};
-  monthTxs.filter(t=>t.type==='Расход').forEach(t=>{
-    const key = t.shift && groups.hasOwnProperty(t.shift) ? t.shift : 'Не указано';
-    groups[key] += t.amount;
-  });
-  const labels = Object.keys(groups).filter(k => groups[k] > 0 || k !== 'Не указано');
-  const data = labels.map(k=>groups[k]);
-  const ctx = document.getElementById('shiftChart');
-  if(shiftChart) shiftChart.destroy();
-  shiftChart = new Chart(ctx, {
-    type:'bar',
-    data:{ labels, datasets:[{ data, backgroundColor:['#7a8fbf','#d4af37','#5fbca5','#6b6355'], borderRadius:6, barThickness:34 }] },
-    options:{
-      indexAxis:'y',
-      maintainAspectRatio:false,
-      plugins:{ legend:{ display:false } },
-      scales:{
-        x:{ ticks:{color:'#9c9384',font:{family:'IBM Plex Mono',size:9}}, grid:{color:'#3a3126'} },
-        y:{ ticks:{color:'#f2ede1',font:{family:'Inter',size:12}}, grid:{display:false} }
-      }
-    }
-  });
-}
-
-function renderCigInsight(monthTxs){
-  const cig = monthTxs.filter(t=>t.type==='Расход' && t.category==='Сигареты').reduce((s,t)=>s+t.amount,0);
-  const note = document.getElementById('cigNote');
-  if(cig === 0){
-    note.textContent = '';
-    return;
-  }
-  const rights = GOALS.find(g=>g.keyword==='права');
-  const pctOfGoal = rights ? Math.min(100, Math.round(cig/rights.target*100)) : 0;
-  note.textContent = `Из них на сигареты: ${fmt(cig)} — это ${pctOfGoal}% от цели «Права», если бы перекинуть туда.`;
-}
-
-function buildReport(){
-  const monthIdx = parseInt(document.getElementById('monthSelect').value);
-  const monthTxs = txsForMonth(monthIdx);
-  const income = monthTxs.filter(t=>t.type==='Доход').reduce((s,t)=>s+t.amount,0);
-  const expense = monthTxs.filter(t=>t.type==='Расход').reduce((s,t)=>s+t.amount,0);
-  const byCat = {};
-  monthTxs.filter(t=>t.type==='Расход').forEach(t=>{ byCat[t.category]=(byCat[t.category]||0)+t.amount; });
-  const catLines = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`  ${c}: ${fmt(v)}`).join('\n');
-  const monthName = MONTHS[monthIdx];
-  return `КОПЕЙКА — отчёт за ${monthName}\n\nДоход: ${fmt(income)}\nРасходы: ${fmt(expense)}\nОстаток: ${fmt(income-expense)}\n\nПо категориям:\n${catLines || '  нет данных'}`;
-}
-
-function renderCatChart(monthTxs){
-  const byCat = {};
-  EXP_CATEGORIES.forEach(c=>byCat[c]=0);
-  monthTxs.filter(t=>t.type==='Расход').forEach(t=>{ byCat[t.category] = (byCat[t.category]||0) + t.amount; });
-  const labels = Object.keys(byCat).filter(c=>byCat[c]>0);
-  const data = labels.map(c=>byCat[c]);
-
-  const palette = ['#d4af37','#d9614f','#5fbca5','#8a7226','#c98b5f','#7a8fbf','#b479a8','#9c9384','#6ba888','#c9a37c'];
-
-  const ctx = document.getElementById('catChart');
-  if(catChart) catChart.destroy();
-  if(labels.length === 0){
-    ctx.getContext('2d').clearRect(0,0,ctx.width,ctx.height);
-    return;
-  }
-  catChart = new Chart(ctx, {
-    type:'doughnut',
-    data:{ labels, datasets:[{ data, backgroundColor: palette, borderColor:'#211b16', borderWidth:2 }] },
-    options:{
-      maintainAspectRatio:false,
-      plugins:{ legend:{ position:'bottom', labels:{ color:'#9c9384', font:{family:'Inter',size:11}, padding:10 } } }
-    }
-  });
-}
-
-function renderTrendChart(){
-  const y = currentYear();
-  const incomeArr = [], expenseArr = [], savingsArr = [];
-  MONTHS.forEach((m,i)=>{
-    const mt = txsForMonth(i);
-    const inc = mt.filter(t=>t.type==='Доход' && t.category!=='Накопление').reduce((s,t)=>s+t.amount,0);
-    const sav = mt.filter(t=>t.type==='Доход' && t.category==='Накопление').reduce((s,t)=>s+t.amount,0);
-    const exp = mt.filter(t=>t.type==='Расход').reduce((s,t)=>s+t.amount,0);
-    incomeArr.push(inc); expenseArr.push(exp); savingsArr.push(sav);
-  });
-  const ctx = document.getElementById('trendChart');
-  if(trendChart) trendChart.destroy();
-  trendChart = new Chart(ctx, {
-    type:'bar',
-    data:{
-      labels: MONTHS,
-      datasets:[
-        {label:'Доход', data:incomeArr, backgroundColor:'#5fbca5', borderRadius:3},
-        {label:'Расходы', data:expenseArr, backgroundColor:'#d9614f', borderRadius:3},
-        {label:'Накопления', data:savingsArr, type:'line', borderColor:'#d4af37', backgroundColor:'#d4af37', tension:.3, yAxisID:'y'}
-      ]
-    },
-    options:{
-      maintainAspectRatio:false,
-      scales:{
-        x:{ ticks:{color:'#9c9384',font:{family:'IBM Plex Mono',size:10}}, grid:{color:'#3a3126'} },
-        y:{ ticks:{color:'#9c9384',font:{family:'IBM Plex Mono',size:9}}, grid:{color:'#3a3126'} }
-      },
-      plugins:{ legend:{ position:'bottom', labels:{ color:'#9c9384', font:{family:'Inter',size:11} } } }
-    }
-  });
-}
-
-const BUDGET_ITEMS = [
-  { name:'Обязательные платежи', planned: OBLIGATIONS_TOTAL,
-    factFn: mt => mt.filter(t=>t.type==='Расход' && t.category==='Обязательные платежи').reduce((s,t)=>s+t.amount,0) },
-  { name:'Долг', planned: DEBT.monthly,
-    factFn: mt => mt.filter(t=>t.type==='Расход' && t.category===DEBT.category).reduce((s,t)=>s+t.amount,0) },
-  { name:'Цели (накопления)', planned: GOALS.reduce((s,g)=>s+g.monthly,0),
-    factFn: mt => mt.filter(t=>t.type==='Доход' && t.category==='Накопление').reduce((s,t)=>s+t.amount,0) },
-  { name:'Пиво и сигареты', planned: 10000,
-    factFn: mt => mt.filter(t=>t.type==='Расход' && ['Сигареты','Алкоголь'].includes(t.category)).reduce((s,t)=>s+t.amount,0) },
-  { name:'Прочие траты', planned: LIMITS.find(l=>l.name==='Прочие траты').limit,
-    factFn: mt => mt.filter(t=>t.type==='Расход' && !['Обязательные платежи','Долг','Сигареты','Алкоголь'].includes(t.category)).reduce((s,t)=>s+t.amount,0) },
-];
-
-function renderBudgetSection(monthTxs){
-  const box = document.getElementById('budgetList');
-  if(!box) return;
-  box.innerHTML = BUDGET_ITEMS.map(item=>{
-    const fact = item.factFn(monthTxs);
-    const pct = Math.min(100, Math.round(fact/item.planned*100));
-    const over = fact > item.planned;
-    const color = over ? 'var(--rust)' : (pct > 85 ? '#c98b5f' : 'var(--gold)');
-    return `
-      <div class="budget-row">
-        <div class="budget-row-top">
-          <span class="budget-name">${item.name}</span>
-          <span class="budget-figures">${fmt(fact)} / ${fmt(item.planned)}</span>
-        </div>
-        <div class="bar"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
-      </div>
-    `;
-  }).join('');
-}
-
-function renderDebt(monthTxs){
-  const paidTotal = txs.filter(t=>t.type==='Расход' && t.category===DEBT.category).reduce((s,t)=>s+t.amount,0);
-  const paidThisMonth = monthTxs.filter(t=>t.type==='Расход' && t.category===DEBT.category).reduce((s,t)=>s+t.amount,0);
-  const remaining = Math.max(0, DEBT.total - paidTotal);
-  const pct = Math.min(100, Math.round(paidTotal/DEBT.total*100));
-  const monthsLeft = remaining > 0 ? Math.ceil(remaining / DEBT.monthly) : 0;
-
-  document.getElementById('debtHint').textContent =
-    remaining === 0
-      ? 'Долг полностью закрыт 🎉'
-      : `Осталось ${fmt(remaining)} из ${fmt(DEBT.total)}. Ориентир — ${fmt(DEBT.monthly)}/мес, ещё примерно ${monthsLeft} мес. до закрытия. В этом месяце внесено: ${fmt(paidThisMonth)}.`;
-  document.getElementById('debtBar').style.width = pct + '%';
-}
-
-let debtChart;
-function renderDebtHistory(){
-  const y = currentYear();
-  const paidByMonth = MONTHS.map((m,i)=>{
-    const mt = txsForMonth(i);
-    return mt.filter(t=>t.type==='Расход' && t.category===DEBT.category).reduce((s,t)=>s+t.amount,0);
-  });
-  const ctx = document.getElementById('debtChart');
-  if(!ctx) return;
-  if(debtChart) debtChart.destroy();
-  debtChart = new Chart(ctx, {
-    type:'bar',
-    data:{
-      labels: MONTHS,
-      datasets:[{ data: paidByMonth, backgroundColor: paidByMonth.map(v => v >= DEBT.monthly ? '#5fbca5' : (v>0 ? '#d4af37' : '#3a3126')), borderRadius:3 }]
-    },
-    options:{
-      maintainAspectRatio:false,
-      plugins:{ legend:{ display:false } },
-      scales:{
-        x:{ ticks:{color:'#9c9384',font:{family:'IBM Plex Mono',size:9}}, grid:{display:false} },
-        y:{ ticks:{color:'#9c9384',font:{family:'IBM Plex Mono',size:9}}, grid:{color:'#3a3126'} }
-      }
-    }
-  });
-}
-
-function renderGoals(){
-  const box = document.getElementById('goalsBox');
-  box.innerHTML = '';
-  GOALS.forEach(g=>{
-    const saved = txs.filter(t=>t.type==='Доход' && t.category==='Накопление' && t.comment && t.comment.toLowerCase().includes(g.keyword))
-                      .reduce((s,t)=>s+t.amount,0);
-    const pct = Math.min(100, Math.round(saved/g.target*100));
-    const el = document.createElement('div');
-    el.className = 'goal';
-    el.innerHTML = `
-      <div class="goal-top">
-        <span class="name">${g.name}</span>
-        <span class="amt">${fmt(saved)} / ${fmt(g.target)}</span>
-      </div>
-      <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
-    `;
-    box.appendChild(el);
-  });
-}
-
-function renderTxList(){
-  const box = document.getElementById('txList');
-  box.innerHTML = '';
-  const sorted = [...txs].sort((a,b)=> new Date(b.date) - new Date(a.date) || b.id - a.id).slice(0,12);
-  if(sorted.length === 0){
-    box.innerHTML = '<div class="empty">Пока пусто. Добавь первую запись выше.</div>';
-    return;
-  }
-  sorted.forEach(t=>{
-    const d = new Date(t.date);
-    const dateStr = d.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'});
-    const row = document.createElement('div');
-    row.className = 'tx';
-    row.innerHTML = `
-      <div class="tx-left">
-        <div class="cat">${t.category}</div>
-        <div class="meta">${dateStr}${t.comment ? ' · ' + t.comment : ''}</div>
-      </div>
-      <div style="display:flex;align-items:center;">
-        <span class="tx-amt ${t.type==='Расход'?'exp':'inc'}">${t.type==='Расход'?'−':'+'}${fmt(t.amount)}</span>
-        <button class="tx-edit" data-id="${t.id}" aria-label="Изменить">✎</button>
-        <button class="tx-del" data-id="${t.id}" aria-label="Удалить">✕</button>
-      </div>
-    `;
-    box.appendChild(row);
-  });
-  box.querySelectorAll('.tx-del').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const raw = btn.dataset.id;
-      const isLocal = raw.startsWith('local-');
-      const id = isLocal ? raw : parseInt(raw, 10);
-      const ok = isLocal ? true : await deleteTxRemote(id);
-      if(ok){
-        txs = txs.filter(t => String(t.id) !== String(raw));
-        persistLocalCache();
-        render();
-      }
-    });
-  });
-  box.querySelectorAll('.tx-edit').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const raw = btn.dataset.id;
-      const tx = txs.find(t => String(t.id) === String(raw));
-      if(!tx) return;
-      editingId = tx.id;
-      currentType = tx.type;
-      document.querySelectorAll('.type-toggle button').forEach(b=>{
-        b.classList.toggle('active', b.dataset.type === tx.type);
-      });
-      populateCategorySelect();
-      document.getElementById('txDate').value = tx.date;
-      document.getElementById('txAmount').value = tx.amount;
-      document.getElementById('txCategory').value = tx.category;
-      document.getElementById('txShift').value = tx.shift || '';
-      document.getElementById('txComment').value = tx.comment || '';
-      const submitBtn = document.querySelector('#txForm .submit-btn');
-      submitBtn.textContent = 'Сохранить изменения';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  });
-}
-
-document.querySelectorAll('.type-toggle button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.type-toggle button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    currentType = btn.dataset.type;
-    populateCategorySelect();
-  });
-});
-
-document.getElementById('txForm').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const date = document.getElementById('txDate').value;
-  const amount = parseFloat(document.getElementById('txAmount').value);
-  const category = document.getElementById('txCategory').value;
-  const shift = document.getElementById('txShift').value;
-  const comment = document.getElementById('txComment').value.trim();
-  if(!date || !amount) return;
-
-  const txData = { date, type: currentType, category, amount, comment, shift };
-  lastInsertError = '';
-  const submitBtn = e.target.querySelector('.submit-btn');
-
-  if(editingId !== null){
-    const isLocal = String(editingId).startsWith('local-');
-    if(isLocal){
-      const idx = txs.findIndex(t => String(t.id) === String(editingId));
-      if(idx !== -1) txs[idx] = { ...txs[idx], ...txData };
-      persistLocalCache();
-    } else {
-      const updated = await updateTxRemote(editingId, txData);
-      if(updated){
-        const idx = txs.findIndex(t => String(t.id) === String(editingId));
-        if(idx !== -1) txs[idx] = updated;
-      } else {
-        const idx = txs.findIndex(t => String(t.id) === String(editingId));
-        if(idx !== -1) txs[idx] = { ...txs[idx], ...txData };
-      }
-      persistLocalCache();
-    }
-    editingId = null;
-    submitBtn.textContent = 'Добавить';
-  } else {
-    const inserted = await insertTx(txData);
-    if(inserted){
-      txs.push(inserted);
-    } else {
-      txs.push({ ...txData, id: 'local-' + Date.now() });
-    }
-    persistLocalCache();
-  }
-
-  document.getElementById('txAmount').value = '';
-  document.getElementById('txComment').value = '';
-  document.getElementById('txShift').value = '';
-  document.getElementById('txDate').valueAsDate = new Date();
-  render();
-
-  if(lastInsertError){
-    const original = submitBtn.textContent;
-    submitBtn.textContent = 'Сохранено локально. Ошибка облака: ' + lastInsertError;
-    setTimeout(()=>{ submitBtn.textContent = original; }, 5000);
-  }
-});
-
-document.getElementById('copyReportBtn').addEventListener('click', async ()=>{
-  const report = buildReport();
-  const btn = document.getElementById('copyReportBtn');
-  try{
-    await navigator.clipboard.writeText(report);
-    btn.textContent = 'Скопировано ✓';
-  }catch(e){
-    btn.textContent = 'Не вышло — выдели текст вручную';
-  }
-  setTimeout(()=>{ btn.textContent = 'Скопировать отчёт'; }, 2200);
-});
-
-// ===== Page router =====
-const PAGE_IDS = ['home','budget','debtgoals','transactions','analytics','report'];
-
-function showPage(pageId, push){
-  if(!PAGE_IDS.includes(pageId)) pageId = 'home';
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  const target = document.getElementById('page-' + pageId);
-  if(target) target.classList.add('active');
-  window.scrollTo(0, 0);
-  if(push) history.pushState({ page: pageId }, '', '#' + pageId);
-  requestAnimationFrame(refreshChartsForVisiblePage);
-}
-
-function refreshChartsForVisiblePage(){
-  const monthIdx = parseInt(document.getElementById('monthSelect').value || 0);
-  const monthTxs = txsForMonth(monthIdx);
-  safeCall(()=>renderCatChart(monthTxs));
-  safeCall(()=>renderTrendChart());
-  safeCall(()=>renderShiftChart(monthTxs));
-  safeCall(()=>renderDebtHistory());
-}
-
-document.querySelectorAll('[data-goto]').forEach(btn=>{
-  btn.addEventListener('click', ()=> showPage(btn.dataset.goto, true));
-});
-document.querySelectorAll('[data-back]').forEach(btn=>{
-  btn.addEventListener('click', ()=> history.back());
-});
-
-window.addEventListener('popstate', (e)=>{
-  const pageId = (e.state && e.state.page) || 'home';
-  showPage(pageId, false);
-});
-
-(async function init(){
-  document.getElementById('txDate').valueAsDate = new Date();
-  populateCategorySelect();
-  setupMonthSelect();
-  safeCall(renderBudgetPlan);
-  await loadTxs();
-  render();
-
-  const initialPage = (location.hash ? location.hash.slice(1) : 'home');
-  history.replaceState({ page: PAGE_IDS.includes(initialPage) ? initialPage : 'home' }, '');
-  showPage(PAGE_IDS.includes(initialPage) ? initialPage : 'home', false);
-
-  if('serviceWorker' in navigator){
-    try{ await navigator.serviceWorker.register('sw.js'); }
-    catch(e){ console.error('SW registration failed:', e); }
-  }
-})();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
