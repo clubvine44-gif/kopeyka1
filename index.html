@@ -203,6 +203,10 @@
   .reserve-amt{font-family:'IBM Plex Mono',monospace;color:var(--muted);}
   .reserve-amt.done{color:var(--mint);}
   .reserve-group-title{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--gold);border-top:1px solid var(--line);margin-top:8px;padding-top:8px;}
+  .cut-row{margin-bottom:12px;}
+  .cut-row-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;}
+  .cut-row-top .amt{font-family:'IBM Plex Mono',monospace;color:var(--gold);}
+  .cut-row input[type="range"]{width:100%;accent-color:var(--gold);height:22px;}
 
   .sync-badge{
     display:inline-flex;align-items:center;gap:5px;
@@ -283,6 +287,22 @@
       <div class="hero-sub" id="heroSub">—</div>
       <div class="hero-warn" id="heroWarn" style="display:none;"></div>
       <div class="hero-warn" id="plannedNote" style="display:none;color:var(--gold);"></div>
+
+      <div id="cutPanel" style="display:none;background:rgba(0,0,0,.16);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:10px;">
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">Не хватает <span id="cutDeficit" style="color:var(--rust);font-weight:600;"></span> — сдвинь ползунки, сколько реально отложить в этом месяце по каждой категории:</div>
+        <div id="cutSliders"></div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-top:10px;">
+          <span>Высвобождено:</span>
+          <span id="cutFreed" style="color:var(--mint);font-family:'IBM Plex Mono',monospace;"></span>
+        </div>
+        <button type="button" class="submit-btn" id="cutApplyBtn" style="margin-top:10px;">Применить на этот месяц</button>
+      </div>
+      <button type="button" class="submit-btn" id="cutOpenBtn" style="display:none;margin-top:10px;background:var(--surface-2);color:var(--text);border:1px solid var(--line);">Сократить в этом месяце</button>
+      <div id="cutActiveNote" style="display:none;font-size:12px;color:var(--muted);margin-top:8px;">
+        Сокращено на этот месяц: <span id="cutActiveAmt" style="color:var(--mint);"></span>
+        <button type="button" id="cutResetBtn" style="background:none;border:none;color:var(--rust);text-decoration:underline;font-size:12px;padding:0;margin-left:6px;">сбросить</button>
+      </div>
+
       <div class="reserves" id="heroReserves"></div>
     </section>
 

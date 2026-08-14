@@ -40,12 +40,15 @@ const SB_HEADERS = { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE
 const META_TYPE = 'Meta';
 const META_SETTINGS_CATEGORY = '__settings__';
 const META_PLANS_CATEGORY = '__plans__';
+const META_CUT_CATEGORY = '__cut__';
 
 let txs = [];                       // обычные операции (без Meta-записей)
 let obligationsState = OBLIGATIONS_DEFAULT.map(o=>({...o}));
 let obligationsRowId = null;        // id Meta-строки с настройками, если уже сохранена
 let plansState = [];                // [{id,kind,name,amount,dueDate,paid}]
 let plansRowId = null;
+let monthlyCut = null;              // {monthKey:'YYYY-MM', oblig, debt, goal} — сокращение резервов на текущий месяц
+let cutRowId = null;
 let currentType = "Расход";
 let currentPlanKind = "Плановая трата";
 let catChart, trendChart, shiftChart, debtChart;
@@ -85,7 +88,7 @@ function persistLocalCache(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(txs)); }catch(e){}
 }
 function persistMetaCache(){
-  try{ localStorage.setItem(STORE_META_KEY, JSON.stringify({ obligationsState, plansState })); }catch(e){}
+  try{ localStorage.setItem(STORE_META_KEY, JSON.stringify({ obligationsState, plansState, monthlyCut })); }catch(e){}
 }
 function readLocalCache(){
   try{ const raw = localStorage.getItem(STORE_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; }
@@ -171,10 +174,12 @@ function splitRowsIntoState(rows){
   const real = [];
   const metaSettingsRows = [];
   const metaPlansRows = [];
+  const metaCutRows = [];
   rows.forEach(r=>{
     if(r.type === META_TYPE){
       if(r.category === META_SETTINGS_CATEGORY) metaSettingsRows.push(r);
       else if(r.category === META_PLANS_CATEGORY) metaPlansRows.push(r);
+      else if(r.category === META_CUT_CATEGORY) metaCutRows.push(r);
     } else {
       real.push(r);
     }
@@ -205,6 +210,18 @@ function splitRowsIntoState(rows){
   } else {
     const cached = readMetaCache();
     if(cached && Array.isArray(cached.plansState)) plansState = cached.plansState;
+  }
+
+  if(metaCutRows.length){
+    const latest = metaCutRows.sort((a,b)=> String(b.id).localeCompare(String(a.id)))[0];
+    cutRowId = latest.id;
+    try{
+      const parsed = JSON.parse(latest.comment || '{}');
+      monthlyCut = parsed && parsed.monthKey ? parsed : null;
+    }catch(e){ console.error('Не удалось разобрать сокращение месяца', e); }
+  } else {
+    const cached = readMetaCache();
+    if(cached && cached.monthlyCut) monthlyCut = cached.monthlyCut;
   }
 }
 
@@ -245,6 +262,36 @@ async function savePlansState(){
   }catch(e){
     console.error('Не удалось сохранить планы в облако (сохранено локально):', e);
     return false;
+  }
+}
+
+function currentMonthKey(){ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; }
+
+async function saveMonthlyCut(oblig, debt, goal){
+  monthlyCut = { monthKey: currentMonthKey(), oblig, debt, goal, updatedAt: Date.now() };
+  persistMetaCache();
+  const payload = { date: new Date().toISOString().slice(0,10), type: META_TYPE, category: META_CUT_CATEGORY, amount:0, shift:'', comment: JSON.stringify(monthlyCut) };
+  try{
+    if(cutRowId){
+      const updated = await updateRow(cutRowId, payload);
+      if(updated) cutRowId = updated.id;
+    } else {
+      const created = await insertRow(payload);
+      if(created) cutRowId = created.id;
+    }
+    return true;
+  }catch(e){
+    console.error('Не удалось сохранить сокращение месяца в облако (сохранено локально):', e);
+    return false;
+  }
+}
+
+async function resetMonthlyCut(){
+  monthlyCut = null;
+  persistMetaCache();
+  if(cutRowId){
+    try{ await deleteRow(cutRowId); }catch(e){ console.error('Не удалось удалить сокращение месяца в облаке:', e); }
+    cutRowId = null;
   }
 }
 
@@ -465,23 +512,40 @@ function computeSpendable(){
   const savedThisMonth = monthTxs.filter(t=>isSaving(t)).reduce((s,t)=>s+(Number(t.amount)||0),0);
   const goalLeft = Math.max(0, totalGoalMonthly - savedThisMonth);
 
+  // "Сокращение месяца": если человек явно решил в этом месяце отложить меньше на
+  // обязательные платежи/долг/цели (через ползунки), применяем это как потолок —
+  // но никогда не выше того, что реально ещё не закрыто.
+  const rawObligLeft = obligLeft, rawDebtLeft = debtLeft, rawGoalLeft = goalLeft;
+  let obligLeftFinal = obligLeft, debtLeftFinal = debtLeft, goalLeftFinal = goalLeft;
+  const cutActive = !!(monthlyCut && monthlyCut.monthKey === currentMonthKey());
+  if(cutActive){
+    obligLeftFinal = Math.min(rawObligLeft, Math.max(0, Number(monthlyCut.oblig)||0));
+    debtLeftFinal = Math.min(rawDebtLeft, Math.max(0, Number(monthlyCut.debt)||0));
+    goalLeftFinal = Math.min(rawGoalLeft, Math.max(0, Number(monthlyCut.goal)||0));
+  }
+
   const unpaidDolzhen = plansState.filter(p => !p.paid && p.kind === 'Должен');
   const unpaidPlanned = plansState.filter(p => !p.paid && p.kind === 'Плановая трата');
   const dolzhenLeft = unpaidDolzhen.reduce((s,p)=>s+(Number(p.amount)||0),0);
   const plannedLeft = unpaidPlanned.reduce((s,p)=>s+(Number(p.amount)||0),0);
   const plansLeft = dolzhenLeft + plannedLeft;
 
-  const reservedTotal = obligLeft + debtLeft + goalLeft + plansLeft;
+  const reservedTotal = obligLeftFinal + debtLeftFinal + goalLeftFinal + plansLeft;
+  const deficitAmount = Math.max(0, reservedTotal - balance);
   const safeDaily = Math.max(0, balance - reservedTotal) / days;
   const freeDaily = Math.max(0, balance) / days;
 
   return {
-    safeDaily, freeDaily, days, payDate, nextAmount,
-    obligLeft, debtLeft, goalLeft, plansLeft, dolzhenLeft, plannedLeft,
+    safeDaily, freeDaily, days, payDate, nextAmount, balance, deficitAmount, cutActive,
+    obligLeft: obligLeftFinal, debtLeft: debtLeftFinal, goalLeft: goalLeftFinal,
+    rawObligLeft, rawDebtLeft, rawGoalLeft,
+    plansLeft, dolzhenLeft, plannedLeft,
     unpaidDolzhen, unpaidPlanned, reservedTotal,
     paidOblig, obligationsTotal, paidDebtThisMonth, debtTotal: DEBT.monthly,
   };
 }
+
+let cutPanelOpen = false; // управляется только явными кликами открыть/закрыть — render() не должен клацать панель сам
 
 function renderHero(){
   const r = computeSpendable();
@@ -490,14 +554,36 @@ function renderHero(){
   const sub = document.getElementById('heroSub');
   const warn = document.getElementById('heroWarn');
   const box = document.getElementById('heroReserves');
+  const cutPanel = document.getElementById('cutPanel');
+  const cutOpenBtn = document.getElementById('cutOpenBtn');
+  const cutActiveNote = document.getElementById('cutActiveNote');
+  const cutDeficitEl = document.getElementById('cutDeficit');
+  const cutActiveAmtEl = document.getElementById('cutActiveAmt');
 
   if(safeEl){ safeEl.textContent = fmt(r.safeDaily); safeEl.className = 'hero-value safe' + (r.safeDaily<=0?' zero':''); }
   if(freeEl){ freeEl.textContent = fmt(r.freeDaily); freeEl.className = 'hero-value free' + (r.freeDaily<=0?' zero':''); }
   if(sub) sub.textContent = `До конца месяца ${r.days} ${daysWord(r.days)} · ближайшая зарплата ${r.payDate.toLocaleDateString('ru-RU',{day:'2-digit',month:'long'})} (+${fmt(r.nextAmount)})`;
 
-  if(warn){
-    if(r.safeDaily <= 0){ warn.style.display='block'; warn.textContent='Свободных денег с учётом резервов пока нет — сначала закрой платежи, долг и цели ниже.'; }
-    else warn.style.display='none';
+  if(r.deficitAmount > 0){
+    if(warn){ warn.style.display='block'; warn.textContent = `Не хватает ${fmt(r.deficitAmount)} с учётом резервов на этот месяц.`; }
+    if(cutOpenBtn){ cutOpenBtn.style.display='block'; cutOpenBtn.textContent = r.cutActive ? 'Пересмотреть сокращение' : 'Сократить в этом месяце'; }
+    if(cutDeficitEl) cutDeficitEl.textContent = fmt(r.deficitAmount);
+    if(cutActiveNote) cutActiveNote.style.display='none';
+    // Панель со слайдерами закрывается/открывается только по клику пользователя —
+    // если её оставить под управлением render(), она будет схлопываться на середине
+    // перетаскивания ползунка при любом фоновом обновлении (тот же класс бага, что
+    // раньше стирал несохранённый ввод в Настройках).
+    if(cutPanel && !cutPanelOpen) cutPanel.style.display='none';
+  } else {
+    if(warn) warn.style.display='none';
+    if(cutOpenBtn) cutOpenBtn.style.display='none';
+    if(cutPanel) cutPanel.style.display='none';
+    cutPanelOpen = false;
+    if(r.cutActive){
+      const freed = (r.rawObligLeft-r.obligLeft) + (r.rawDebtLeft-r.debtLeft) + (r.rawGoalLeft-r.goalLeft);
+      if(cutActiveNote) cutActiveNote.style.display='block';
+      if(cutActiveAmtEl) cutActiveAmtEl.textContent = fmt(freed);
+    } else if(cutActiveNote) cutActiveNote.style.display='none';
   }
 
   if(box){
@@ -536,6 +622,61 @@ function reserveRowHtml(name, left){
       <span class="reserve-amt ${left === 0 ? 'done' : ''}">${left === 0 ? 'закрыто ✓' : 'осталось ' + fmt(left)}</span>
     </div>
   `;
+}
+
+/* ===================== Панель "Сократить в этом месяце" =====================
+   Если резервов не хватает (баланс минус обязательные платежи/долг/цели/планы уходит
+   в минус), вместо жёсткого зануления показываем ползунки: сколько реально отложить
+   по каждой категории в этом конкретном месяце. Это не меняет сами цели навсегда —
+   только эффективный резерв на текущий месяц. */
+function buildCutSliders(){
+  const r = computeSpendable();
+  const box = document.getElementById('cutSliders');
+  if(!box) return;
+  const current = {
+    oblig: r.cutActive ? Math.min(r.rawObligLeft, Number(monthlyCut.oblig)||0) : r.rawObligLeft,
+    debt: r.cutActive ? Math.min(r.rawDebtLeft, Number(monthlyCut.debt)||0) : r.rawDebtLeft,
+    goal: r.cutActive ? Math.min(r.rawGoalLeft, Number(monthlyCut.goal)||0) : r.rawGoalLeft,
+  };
+  const rows = [
+    { key:'oblig', label:'Обязательные платежи', max:r.rawObligLeft, val:current.oblig },
+    { key:'debt', label:'Долг', max:r.rawDebtLeft, val:current.debt },
+    { key:'goal', label:'Цели', max:r.rawGoalLeft, val:current.goal },
+  ].filter(row => row.max > 0);
+
+  if(!rows.length){
+    box.innerHTML = '<div class="empty">Резервировать нечего — весь дефицит из-за долга по "должен"/плановым тратам ниже, отредактируй их в Настройках.</div>';
+    updateCutFreedPreview();
+    return;
+  }
+
+  box.innerHTML = rows.map(row => `
+    <div class="cut-row">
+      <div class="cut-row-top"><span>${row.label}</span><span class="amt" data-out="${row.key}">${fmt(row.val)}</span></div>
+      <input type="range" min="0" max="${Math.round(row.max)}" value="${Math.round(row.val)}" data-key="${row.key}">
+    </div>
+  `).join('');
+  box.querySelectorAll('input[type="range"]').forEach(inp=>{
+    inp.addEventListener('input', updateCutFreedPreview);
+  });
+  updateCutFreedPreview();
+}
+
+function updateCutFreedPreview(){
+  const r = computeSpendable();
+  const box = document.getElementById('cutSliders');
+  const freedEl = document.getElementById('cutFreed');
+  if(!box || !freedEl) return;
+  const rawMap = { oblig: r.rawObligLeft, debt: r.rawDebtLeft, goal: r.rawGoalLeft };
+  let freed = 0;
+  box.querySelectorAll('input[type="range"]').forEach(inp=>{
+    const key = inp.dataset.key;
+    const val = Number(inp.value);
+    freed += Math.max(0, (rawMap[key]||0) - val);
+    const out = box.querySelector(`[data-out="${key}"]`);
+    if(out) out.textContent = fmt(val);
+  });
+  freedEl.textContent = fmt(freed);
 }
 
 /* Отдельный, всегда видимый список будущих (плановых) операций на главном экране —
@@ -1009,6 +1150,28 @@ function showPage(pageId, push){
 
 /* ===================== Инициализация обработчиков ===================== */
 function wireEvents(){
+  document.getElementById('cutOpenBtn').addEventListener('click', ()=>{
+    cutPanelOpen = true;
+    buildCutSliders();
+    document.getElementById('cutPanel').style.display = 'block';
+    document.getElementById('cutOpenBtn').style.display = 'none';
+  });
+  document.getElementById('cutApplyBtn').addEventListener('click', async ()=>{
+    const r = computeSpendable();
+    const vals = { oblig: r.rawObligLeft, debt: r.rawDebtLeft, goal: r.rawGoalLeft };
+    document.querySelectorAll('#cutSliders input[type="range"]').forEach(inp=>{ vals[inp.dataset.key] = Number(inp.value); });
+    const btn = document.getElementById('cutApplyBtn');
+    btn.disabled = true; btn.textContent = 'Сохраняю…';
+    await saveMonthlyCut(vals.oblig, vals.debt, vals.goal);
+    cutPanelOpen = false;
+    btn.disabled = false; btn.textContent = 'Применить на этот месяц';
+    render();
+  });
+  document.getElementById('cutResetBtn').addEventListener('click', async ()=>{
+    await resetMonthlyCut();
+    render();
+  });
+
   document.querySelectorAll('.type-toggle button[data-type]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const group = btn.closest('.type-toggle');
