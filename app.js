@@ -459,7 +459,7 @@ function computeSpendable(){
   const savedThisMonth = monthTxs.filter(t=>isSaving(t)).reduce((s,t)=>s+(Number(t.amount)||0),0);
   const goalLeft = Math.max(0, totalGoalMonthly - savedThisMonth);
 
-  const plansLeft = plansState.filter(p => !p.paid && dateOnly(p.dueDate) <= payDate).reduce((s,p)=>s+(Number(p.amount)||0),0);
+  const plansLeft = plansState.filter(p => !p.paid).reduce((s,p)=>s+(Number(p.amount)||0),0);
 
   const reservedTotal = obligLeft + debtLeft + goalLeft + plansLeft;
   const safeDaily = Math.max(0, balance - reservedTotal) / days;
@@ -480,8 +480,8 @@ function renderHero(){
   const warn = document.getElementById('heroWarn');
   const box = document.getElementById('heroReserves');
 
-  if(safeEl){ safeEl.textContent = fmt(r.safeDaily); safeEl.className = 'hero-value' + (r.safeDaily<=0?' zero':''); }
-  if(freeEl){ freeEl.textContent = fmt(r.freeDaily); freeEl.className = 'hero-value alt' + (r.freeDaily<=0?' zero':''); }
+  if(safeEl){ safeEl.textContent = fmt(r.safeDaily); safeEl.className = 'hero-value safe' + (r.safeDaily<=0?' zero':''); }
+  if(freeEl){ freeEl.textContent = fmt(r.freeDaily); freeEl.className = 'hero-value free' + (r.freeDaily<=0?' zero':''); }
   if(sub) sub.textContent = `${r.days} ${daysWord(r.days)} до зарплаты (${r.payDate.toLocaleDateString('ru-RU',{day:'2-digit',month:'long'})}) · ожидается +${fmt(r.nextAmount)}`;
 
   if(warn){
@@ -495,7 +495,11 @@ function renderHero(){
       { name:'Долг (в этом месяце)', left: r.debtLeft },
       { name:'Цели', left: r.goalLeft },
     ];
-    if(r.plansLeft > 0) items.push({ name:'«Должен» / плановые траты', left: r.plansLeft });
+    // Каждый неоплаченный "должен"/"плановая трата" показывается отдельной строкой,
+    // а не одной общей суммой — чтобы было видно, что именно и сколько ещё не закрыто.
+    plansState.filter(p=>!p.paid).forEach(p=>{
+      items.push({ name: `${p.kind === 'Должен' ? 'Должен' : 'План'}: ${p.name}`, left: Number(p.amount)||0 });
+    });
     box.innerHTML = items.map(it => `
       <div class="reserve-row">
         <div class="reserve-status">
@@ -506,6 +510,33 @@ function renderHero(){
       </div>
     `).join('');
   }
+
+  renderUpcoming();
+}
+
+/* Отдельный, всегда видимый список будущих (плановых) операций на главном экране —
+   чтобы было прямое подтверждение, что запись с будущей датой сохранилась и будет
+   учтена, когда наступит её месяц. */
+function renderUpcoming(){
+  const box = document.getElementById('upcomingList');
+  if(!box) return;
+  const upcoming = txs.filter(t => isFutureDate(t.date)).sort((a,b)=> new Date(a.date) - new Date(b.date));
+  const wrap = document.getElementById('upcomingSection');
+  if(!upcoming.length){
+    if(wrap) wrap.style.display = 'none';
+    return;
+  }
+  if(wrap) wrap.style.display = 'block';
+  box.innerHTML = upcoming.map(t=>{
+    const d = dateOnly(t.date);
+    const dateStr = d.toLocaleDateString('ru-RU', {day:'2-digit', month:'long'});
+    return `
+      <div class="reserve-row">
+        <div class="reserve-status"><span>${dateStr} · ${t.category}${t.comment ? ' · ' + t.comment : ''}</span></div>
+        <span class="reserve-amt">${t.type==='Расход'?'−':'+'}${fmt(t.amount)}</span>
+      </div>
+    `;
+  }).join('');
 }
 
 /* ===================== Основной рендер ===================== */
@@ -537,9 +568,15 @@ function render(){
   safeCall(()=>renderGoals());
   safeCall(()=>renderTxList());
   safeCall(()=>renderCigInsight(monthTxs));
-  safeCall(renderObligSettings);
-  safeCall(renderPlansList);
   safeCall(renderReportPreview);
+
+  // renderObligSettings() и renderPlansList() НЕ вызываются здесь специально:
+  // render() запускается после КАЖДОГО действия в приложении (добавил трату — вызвался
+  // render()), а эти две функции полностью пересобирают поля ввода в Настройках. Если
+  // делать это на каждый чих, то любой незасохранённый ввод в форме настроек стирается
+  // раньше, чем человек успевает нажать «Сохранить». Поэтому они рисуются один раз при
+  // старте и вручную — сразу после своих собственных изменений (добавление/удаление
+  // платежа, сохранение, добавление/оплата/удаление плана).
 
   // Тяжёлые графики — только когда соответствующая страница реально открыта,
   // чтобы не тратить время на перерисовку невидимых canvas при каждом вводе.
@@ -634,6 +671,7 @@ function renderPlansList(){
       if(!item) return;
       item.paid = !item.paid;
       await savePlansState();
+      renderPlansList();
       render();
     });
   });
@@ -641,6 +679,7 @@ function renderPlansList(){
     btn.addEventListener('click', async ()=>{
       plansState = plansState.filter(p=>p.id!==btn.dataset.id);
       await savePlansState();
+      renderPlansList();
       render();
     });
   });
@@ -940,6 +979,7 @@ function showPage(pageId, push){
   if(target) target.classList.add('active');
   window.scrollTo(0, 0);
   if(push) history.pushState({ page: pageId }, '', '#' + pageId);
+  if(pageId === 'settings'){ safeCall(renderObligSettings); safeCall(renderPlansList); }
   requestAnimationFrame(refreshChartsForVisiblePage);
 }
 
@@ -993,6 +1033,7 @@ function wireEvents(){
     status.textContent = 'Сохраняю…';
     const ok = await saveObligationsSettings(list);
     status.textContent = ok ? 'Сохранено ✓' : 'Сохранено локально (нет связи с облаком)';
+    renderObligSettings();
     render();
     setTimeout(()=>{ status.textContent=''; }, 3000);
   });
@@ -1016,6 +1057,7 @@ function wireEvents(){
     document.getElementById('planAmount').value='';
     document.getElementById('planDate').value='';
     await savePlansState();
+    renderPlansList();
     render();
   });
 }
@@ -1031,13 +1073,36 @@ function wireEvents(){
 
   await loadTxs();
   render();
+  safeCall(renderObligSettings);
+  safeCall(renderPlansList);
 
   const initialPage = (location.hash ? location.hash.slice(1) : 'home');
   history.replaceState({ page: PAGE_IDS.includes(initialPage) ? initialPage : 'home' }, '');
   showPage(PAGE_IDS.includes(initialPage) ? initialPage : 'home', false);
 
   if('serviceWorker' in navigator){
-    try{ await navigator.serviceWorker.register('sw.js'); }
+    try{
+      const reg = await navigator.serviceWorker.register('sw.js');
+      reg.update().catch(()=>{});
+      // Если появилась новая версия sw.js — не ждать закрытия всех вкладок, а сразу
+      // применить её и один раз перезагрузить страницу, чтобы человек не застревал
+      // на старой закэшированной версии приложения (это уже случалось с этим проектом).
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+        if(reloaded) return;
+        reloaded = true;
+        location.reload();
+      });
+      reg.addEventListener('updatefound', ()=>{
+        const nw = reg.installing;
+        if(!nw) return;
+        nw.addEventListener('statechange', ()=>{
+          if(nw.state === 'installed' && navigator.serviceWorker.controller){
+            nw.postMessage && nw.postMessage('skipWaiting');
+          }
+        });
+      });
+    }
     catch(e){ console.error('SW registration failed:', e); }
   }
 

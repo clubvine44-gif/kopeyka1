@@ -1,9 +1,13 @@
-const CACHE_NAME = 'kopeyka-shell-v4';
+const CACHE_NAME = 'kopeyka-shell-v5';
 const SHELL_FILES = ['./', './index.html', './app.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_FILES)));
   self.skipWaiting();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

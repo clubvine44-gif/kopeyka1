@@ -148,6 +148,8 @@
   }
   .type-toggle button.active[data-type="Расход"]{background:rgba(217,97,79,.18);border-color:var(--rust);color:var(--rust);}
   .type-toggle button.active[data-type="Доход"]{background:rgba(95,188,165,.18);border-color:var(--mint);color:var(--mint);}
+  .type-toggle button.active[data-kind="Должен"]{background:rgba(217,97,79,.18);border-color:var(--rust);color:var(--rust);}
+  .type-toggle button.active[data-kind="Плановая трата"]{background:rgba(212,175,55,.18);border-color:var(--gold);color:var(--gold);}
   .submit-btn{
     background:var(--gold);color:#171310;border:none;border-radius:9px;
     padding:11px;font-weight:600;font-size:14.5px;cursor:pointer;margin-top:2px;
@@ -182,12 +184,13 @@
     font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;
     text-transform:uppercase;color:var(--gold-dim);margin-bottom:8px;
   }
-  .hero-value{font-family:'Fraunces',serif;font-weight:700;font-size:38px;color:var(--gold);line-height:1;}
+  .hero-value{font-family:'Fraunces',serif;font-weight:700;font-size:26px;line-height:1.15;}
   .hero-value.zero{color:var(--rust);}
-  .hero-value.alt{color:var(--mint);font-size:30px;}
-  .hero-split{display:flex;justify-content:center;gap:22px;align-items:flex-end;}
-  .hero-col{display:flex;flex-direction:column;align-items:center;}
-  .hero-sub{color:var(--muted);font-size:13px;margin-top:8px;}
+  .hero-value.safe{color:var(--gold);}
+  .hero-value.free{color:var(--mint);}
+  .hero-split{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;text-align:center;}
+  .hero-col{background:rgba(0,0,0,.14);border:1px solid var(--line);border-radius:12px;padding:12px 8px;min-width:0;}
+  .hero-sub{color:var(--muted);font-size:12.5px;margin-top:12px;}
   .hero-detail{color:var(--faint);font-size:11.5px;margin-top:6px;}
   .hero-warn{color:var(--rust);font-size:12.5px;font-weight:600;margin-top:10px;}
 
@@ -269,17 +272,22 @@
       <div class="hero-split">
         <div class="hero-col">
           <div class="hero-label">С резервами</div>
-          <div class="hero-value" id="heroDailySafe">—</div>
+          <div class="hero-value safe" id="heroDailySafe">—</div>
         </div>
         <div class="hero-col">
           <div class="hero-label">Без резервов</div>
-          <div class="hero-value alt" id="heroDailyFree">—</div>
+          <div class="hero-value free" id="heroDailyFree">—</div>
         </div>
       </div>
       <div class="hero-sub" id="heroSub">—</div>
       <div class="hero-warn" id="heroWarn" style="display:none;"></div>
       <div class="hero-warn" id="plannedNote" style="display:none;color:var(--gold);"></div>
       <div class="reserves" id="heroReserves"></div>
+    </section>
+
+    <section id="upcomingSection" style="display:none;">
+      <h2>Ближайшие плановые операции</h2>
+      <div class="reserves" id="upcomingList" style="border-top:none;padding-top:0;margin-top:0;"></div>
     </section>
 
     <div class="stat remain-card">
@@ -377,7 +385,6 @@
 
     <section>
       <h2>Обязательные платежи</h2>
-      <div class="hint">Измени суммы под свою реальную ситуацию — они сразу учтутся в расчётах.</div>
       <div id="obligList" style="display:flex;flex-direction:column;gap:8px;"></div>
       <button type="button" class="submit-btn" id="obligAddBtn" style="margin-top:10px;background:var(--surface-2);color:var(--text);border:1px solid var(--line);">+ Добавить платёж</button>
       <button type="button" class="submit-btn" id="obligSaveBtn" style="margin-top:8px;">Сохранить платежи</button>
@@ -386,7 +393,6 @@
 
     <section>
       <h2>«Должен» и «Плановая трата»</h2>
-      <div class="hint">Обе учитываются в значении «С резервами» до указанной даты платежа, пока не отмечены оплаченными.</div>
       <form id="planForm">
         <div class="type-toggle">
           <button type="button" data-kind="Плановая трата" class="active">Плановая трата</button>
