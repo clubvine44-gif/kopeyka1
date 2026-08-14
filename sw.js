@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kopeyka-shell-v3';
+const CACHE_NAME = 'kopeyka-shell-v4';
 const SHELL_FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './fixes.js'];
 
 self.addEventListener('install', (event) => {
@@ -19,11 +19,10 @@ self.addEventListener('fetch', (event) => {
   if (url.hostname.includes('supabase.co')) return;
   if (req.method !== 'GET') return;
 
-  // Inject the targeted fixes into index.html without rewriting the large existing file.
   if (url.pathname.endsWith('/index.html') || url.pathname.endsWith('/')) {
     event.respondWith((async () => {
       try {
-        const response = await fetch(req);
+        const response = await fetch(req, {cache:'no-store'});
         if (!response.ok) return response;
         const type = response.headers.get('content-type') || '';
         if (!type.includes('text/html')) return response;
@@ -41,8 +40,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first for the app shell; cache is only a fallback.
-  event.respondWith(fetch(req).then(response => {
+  event.respondWith(fetch(req, {cache:'no-store'}).then(response => {
     if (response && response.status === 200) {
       const clone = response.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
