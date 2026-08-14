@@ -1,5 +1,5 @@
-const CACHE_NAME = 'kopeyka-shell-v5';
-const SHELL_FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './fixes.js'];
+const CACHE_NAME = 'kopeyka-shell-v6';
+const SHELL_FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './fixes.js', './enhancements.js'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_FILES)));
@@ -27,8 +27,8 @@ self.addEventListener('fetch', (event) => {
         const type = response.headers.get('content-type') || '';
         if (!type.includes('text/html')) return response;
         const text = await response.text();
-        if (text.includes('fixes.js')) return new Response(text, {status: response.status, headers: response.headers});
-        const injected = text.replace('</body>', '<script src="./fixes.js"></script>\n</body>');
+        const injected = text
+          .replace('</body>', '<script src="./fixes.js"></script>\n<script src="./enhancements.js"></script>\n</body>');
         const headers = new Headers(response.headers);
         headers.set('content-type', 'text/html; charset=utf-8');
         return new Response(injected, {status: response.status, statusText: response.statusText, headers});
