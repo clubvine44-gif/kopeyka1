@@ -15,4 +15,12 @@ class KopeykaDb(context: Context) : SQLiteOpenHelper(context, "kopeyka.db", null
     fun add(t: TransactionModel): Long = writableDatabase.insertOrThrow("transactions", null, android.content.ContentValues().apply {
         put("date", t.date); put("type", t.type); put("category", t.category); put("amount", t.amount); put("comment", t.comment); put("shift", t.shift); put("sync_state", "PENDING")
     })
+
+    fun observeAll(): List<TransactionModel> {
+        val result = mutableListOf<TransactionModel>()
+        readableDatabase.query("transactions", arrayOf("id", "date", "type", "category", "amount", "comment", "shift"), null, null, null, null, "date DESC, id DESC").use { c ->
+            while (c.moveToNext()) result += TransactionModel(c.getLong(0), c.getString(1), c.getString(2), c.getString(3), c.getLong(4), c.getString(5), c.getString(6))
+        }
+        return result
+    }
 }
