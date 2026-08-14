@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun OfflineHome(repository: TransactionRepository) {
-    val rows by repository.transactions.collectAsState()
+    val rows by repository.transactions.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var amountText by remember { mutableStateOf("") }
