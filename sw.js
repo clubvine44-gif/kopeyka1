@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kopeyka-shell-v5';
+const CACHE_NAME = 'kopeyka-shell-v6';
 const SHELL_FILES = ['./', './index.html', './app.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {

@@ -432,7 +432,13 @@ function nextPaydayInfo(){
       платежей, накоплений на цели и долга — просто общий остаток / дней до зарплаты. */
 function computeSpendable(){
   const today = todayOnly();
-  const { date: payDate, amount: nextAmount, days } = nextPaydayInfo();
+  const { date: payDate, amount: nextAmount } = nextPaydayInfo();
+
+  // Раньше делили на количество дней "от сегодня до ближайшей зарплаты" — из-за этого
+  // сумма на день скакала (зарплата то через 2 дня, то через 15) и не совпадала с тем,
+  // как обычно планируют бюджет помесячно. Теперь считаем дни до конца ТЕКУЩЕГО месяца.
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+  const days = Math.max(1, lastDayOfMonth - today.getDate() + 1);
 
   const isIncome = t => t.type==='Доход' && t.category!=='Накопление';
   const isSaving = t => t.type==='Доход' && t.category==='Накопление';
@@ -459,7 +465,11 @@ function computeSpendable(){
   const savedThisMonth = monthTxs.filter(t=>isSaving(t)).reduce((s,t)=>s+(Number(t.amount)||0),0);
   const goalLeft = Math.max(0, totalGoalMonthly - savedThisMonth);
 
-  const plansLeft = plansState.filter(p => !p.paid).reduce((s,p)=>s+(Number(p.amount)||0),0);
+  const unpaidDolzhen = plansState.filter(p => !p.paid && p.kind === 'Должен');
+  const unpaidPlanned = plansState.filter(p => !p.paid && p.kind === 'Плановая трата');
+  const dolzhenLeft = unpaidDolzhen.reduce((s,p)=>s+(Number(p.amount)||0),0);
+  const plannedLeft = unpaidPlanned.reduce((s,p)=>s+(Number(p.amount)||0),0);
+  const plansLeft = dolzhenLeft + plannedLeft;
 
   const reservedTotal = obligLeft + debtLeft + goalLeft + plansLeft;
   const safeDaily = Math.max(0, balance - reservedTotal) / days;
@@ -467,7 +477,8 @@ function computeSpendable(){
 
   return {
     safeDaily, freeDaily, days, payDate, nextAmount,
-    obligLeft, debtLeft, goalLeft, plansLeft, reservedTotal,
+    obligLeft, debtLeft, goalLeft, plansLeft, dolzhenLeft, plannedLeft,
+    unpaidDolzhen, unpaidPlanned, reservedTotal,
     paidOblig, obligationsTotal, paidDebtThisMonth, debtTotal: DEBT.monthly,
   };
 }
@@ -482,7 +493,7 @@ function renderHero(){
 
   if(safeEl){ safeEl.textContent = fmt(r.safeDaily); safeEl.className = 'hero-value safe' + (r.safeDaily<=0?' zero':''); }
   if(freeEl){ freeEl.textContent = fmt(r.freeDaily); freeEl.className = 'hero-value free' + (r.freeDaily<=0?' zero':''); }
-  if(sub) sub.textContent = `${r.days} ${daysWord(r.days)} до зарплаты (${r.payDate.toLocaleDateString('ru-RU',{day:'2-digit',month:'long'})}) · ожидается +${fmt(r.nextAmount)}`;
+  if(sub) sub.textContent = `До конца месяца ${r.days} ${daysWord(r.days)} · ближайшая зарплата ${r.payDate.toLocaleDateString('ru-RU',{day:'2-digit',month:'long'})} (+${fmt(r.nextAmount)})`;
 
   if(warn){
     if(r.safeDaily <= 0){ warn.style.display='block'; warn.textContent='Свободных денег с учётом резервов пока нет — сначала закрой платежи, долг и цели ниже.'; }
@@ -495,23 +506,36 @@ function renderHero(){
       { name:'Долг (в этом месяце)', left: r.debtLeft },
       { name:'Цели', left: r.goalLeft },
     ];
-    // Каждый неоплаченный "должен"/"плановая трата" показывается отдельной строкой,
-    // а не одной общей суммой — чтобы было видно, что именно и сколько ещё не закрыто.
-    plansState.filter(p=>!p.paid).forEach(p=>{
-      items.push({ name: `${p.kind === 'Должен' ? 'Должен' : 'План'}: ${p.name}`, left: Number(p.amount)||0 });
-    });
-    box.innerHTML = items.map(it => `
-      <div class="reserve-row">
-        <div class="reserve-status">
-          <span class="reserve-dot ${it.left === 0 ? 'done' : 'pending'}"></span>
-          <span>${it.name}</span>
-        </div>
-        <span class="reserve-amt ${it.left === 0 ? 'done' : ''}">${it.left === 0 ? 'закрыто ✓' : 'осталось ' + fmt(it.left)}</span>
-      </div>
-    `).join('');
+    const rowsHtml = items.map(it => reserveRowHtml(it.name, it.left)).join('');
+
+    // "Должен" и "Плановая трата" — это две разные категории, не одна общая сумма:
+    // у каждой свой заголовок-подытог, а под ним — конкретные записи этой категории.
+    const groupHtml = (title, list, total) => {
+      if(!list.length) return '';
+      return `
+        <div class="reserve-group-title">${title} — ${fmt(total)}</div>
+        ${list.map(p => reserveRowHtml(p.name, Number(p.amount)||0)).join('')}
+      `;
+    };
+
+    box.innerHTML = rowsHtml
+      + groupHtml('Должен', r.unpaidDolzhen, r.dolzhenLeft)
+      + groupHtml('Плановая трата', r.unpaidPlanned, r.plannedLeft);
   }
 
   renderUpcoming();
+}
+
+function reserveRowHtml(name, left){
+  return `
+    <div class="reserve-row">
+      <div class="reserve-status">
+        <span class="reserve-dot ${left === 0 ? 'done' : 'pending'}"></span>
+        <span>${name}</span>
+      </div>
+      <span class="reserve-amt ${left === 0 ? 'done' : ''}">${left === 0 ? 'закрыто ✓' : 'осталось ' + fmt(left)}</span>
+    </div>
+  `;
 }
 
 /* Отдельный, всегда видимый список будущих (плановых) операций на главном экране —
