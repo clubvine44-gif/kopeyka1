@@ -547,9 +547,20 @@ function computeSpendable(){
   const plansLeft = dolzhenLeft + plannedLeft;
 
   const reservedTotal = obligLeftFinal + debtLeftFinal + goalLeftFinal + plansLeft;
-  const deficitAmount = Math.max(0, reservedTotal - balance);
-  const safeDaily = Math.max(0, balance - reservedTotal) / days;
-  const freeDaily = Math.max(0, balance) / days;
+
+  // Резервы (обязательные платежи, "должен" и т.д.) обычно закрываются именно в
+  // зарплату — программа уже показывает дату и сумму ближайшей зарплаты рядом с
+  // предупреждением о нехватке, но раньше в сам расчёт "хватает/не хватает" эта
+  // сумма не попадала, из-за чего дефицит показывался даже когда зарплата в этом
+  // же месяце полностью его покрывает. Теперь учитываем зарплату, если она придёт
+  // до конца текущего месяца (то есть до того, как считаются days и резервы).
+  const monthEndDate = new Date(today.getFullYear(), today.getMonth()+1, 0);
+  const incomeThisMonth = (payDate <= monthEndDate) ? nextAmount : 0;
+  const availableThisMonth = balance + incomeThisMonth;
+
+  const deficitAmount = Math.max(0, reservedTotal - availableThisMonth);
+  const safeDaily = Math.max(0, availableThisMonth - reservedTotal) / days;
+  const freeDaily = Math.max(0, availableThisMonth) / days;
 
   return {
     safeDaily, freeDaily, days, payDate, nextAmount, balance, deficitAmount, cutActive,
