@@ -564,43 +564,53 @@ function renderHero(){
   if(freeEl){ freeEl.textContent = fmt(r.freeDaily); freeEl.className = 'hero-value free' + (r.freeDaily<=0?' zero':''); }
   if(sub) sub.textContent = `До конца месяца ${r.days} ${daysWord(r.days)} · ближайшая зарплата ${r.payDate.toLocaleDateString('ru-RU',{day:'2-digit',month:'long'})} (+${fmt(r.nextAmount)})`;
 
+  const freed = (r.rawObligLeft-r.obligLeft) + (r.rawDebtLeft-r.debtLeft) + (r.rawGoalLeft-r.goalLeft);
+
   if(r.deficitAmount > 0){
     if(warn){ warn.style.display='block'; warn.textContent = `Не хватает ${fmt(r.deficitAmount)} с учётом резервов на этот месяц.`; }
     if(cutOpenBtn){ cutOpenBtn.style.display='block'; cutOpenBtn.textContent = r.cutActive ? 'Пересмотреть сокращение' : 'Сократить в этом месяце'; }
     if(cutDeficitEl) cutDeficitEl.textContent = fmt(r.deficitAmount);
     if(cutActiveNote) cutActiveNote.style.display='none';
-    // Панель со слайдерами закрывается/открывается только по клику пользователя —
-    // если её оставить под управлением render(), она будет схлопываться на середине
-    // перетаскивания ползунка при любом фоновом обновлении (тот же класс бага, что
-    // раньше стирал несохранённый ввод в Настройках).
-    if(cutPanel && !cutPanelOpen) cutPanel.style.display='none';
   } else {
     if(warn) warn.style.display='none';
     if(cutOpenBtn) cutOpenBtn.style.display='none';
-    if(cutPanel) cutPanel.style.display='none';
-    cutPanelOpen = false;
     if(r.cutActive){
-      const freed = (r.rawObligLeft-r.obligLeft) + (r.rawDebtLeft-r.debtLeft) + (r.rawGoalLeft-r.goalLeft);
       if(cutActiveNote) cutActiveNote.style.display='block';
       if(cutActiveAmtEl) cutActiveAmtEl.textContent = fmt(freed);
-    } else if(cutActiveNote) cutActiveNote.style.display='none';
+    } else {
+      if(cutActiveNote) cutActiveNote.style.display='none';
+    }
   }
+
+  // Панель со слайдерами закрывается/открывается только по клику пользователя —
+  // если её оставить под управлением render(), она будет схлопываться на середине
+  // перетаскивания ползунка при любом фоновом обновлении (тот же класс бага, что
+  // раньше стирал несохранённый ввод в Настройках). Единственное исключение — если
+  // сокращать уже вовсе нечего (нет ни дефицита, ни активного сокращения), тогда
+  // панель точно неактуальна и её можно закрыть.
+  if(cutPanel && !cutPanelOpen) cutPanel.style.display = 'none';
+  if(r.deficitAmount <= 0 && !r.cutActive) cutPanelOpen = false;
 
   if(box){
     const items = [
-      { name:'Обязательные платежи', left: r.obligLeft },
-      { name:'Долг (в этом месяце)', left: r.debtLeft },
-      { name:'Цели', left: r.goalLeft },
+      { name:'Обязательные платежи', left: r.obligLeft, raw: r.rawObligLeft },
+      { name:'Долг (в этом месяце)', left: r.debtLeft, raw: r.rawDebtLeft },
+      { name:'Цели', left: r.goalLeft, raw: r.rawGoalLeft },
     ];
-    const rowsHtml = items.map(it => reserveRowHtml(it.name, it.left)).join('');
+    const rowsHtml = items.map(it => reserveRowHtml(it.name, it.left, r.cutActive && it.raw > it.left, it.raw)).join('');
 
     // "Должен" и "Плановая трата" — это две разные категории, не одна общая сумма:
-    // у каждой свой заголовок-подытог, а под ним — конкретные записи этой категории.
+    // у каждой свой заголовок-подытог, а под ним — конкретные записи этой категории
+    // (с датой, к которой нужно рассчитаться).
     const groupHtml = (title, list, total) => {
       if(!list.length) return '';
       return `
         <div class="reserve-group-title">${title} — ${fmt(total)}</div>
-        ${list.map(p => reserveRowHtml(p.name, Number(p.amount)||0)).join('')}
+        ${list.map(p => {
+          const d = dateOnly(p.dueDate);
+          const dateStr = d.toLocaleDateString('ru-RU', {day:'2-digit', month:'long'});
+          return reserveRowHtml(`${p.name} — до ${dateStr}`, Number(p.amount)||0);
+        }).join('')}
       `;
     };
 
@@ -612,14 +622,29 @@ function renderHero(){
   renderUpcoming();
 }
 
-function reserveRowHtml(name, left){
+function reserveRowHtml(name, left, isCut, rawLeft){
+  // Три разных состояния строки резерва:
+  //  - "закрыто ✓"   — реально оплачено полностью, резервировать больше не нужно;
+  //  - "сокращено ✕" — НЕ оплачено, просто в этом месяце решили отложить меньше
+  //                    (через ползунки) — это не заслуга, а осознанный минус,
+  //                    поэтому подсвечивается отдельным цветом, а не зелёным;
+  //  - "осталось"    — обычный незакрытый резерв.
+  let dotClass, amtClass, label;
+  if(isCut){
+    dotClass = 'cut'; amtClass = 'cut';
+    label = left === 0 ? `сокращено ✕ (было ${fmt(rawLeft)})` : `сокращено до ${fmt(left)} ✕ (было ${fmt(rawLeft)})`;
+  } else if(left === 0){
+    dotClass = 'done'; amtClass = 'done'; label = 'закрыто ✓';
+  } else {
+    dotClass = 'pending'; amtClass = ''; label = 'осталось ' + fmt(left);
+  }
   return `
     <div class="reserve-row">
       <div class="reserve-status">
-        <span class="reserve-dot ${left === 0 ? 'done' : 'pending'}"></span>
+        <span class="reserve-dot ${dotClass}"></span>
         <span>${name}</span>
       </div>
-      <span class="reserve-amt ${left === 0 ? 'done' : ''}">${left === 0 ? 'закрыто ✓' : 'осталось ' + fmt(left)}</span>
+      <span class="reserve-amt ${amtClass}">${label}</span>
     </div>
   `;
 }
@@ -802,6 +827,31 @@ function readObligFormIntoState(){
 }
 
 /* ===================== Настройки: «Должен» / «Плановая трата» ===================== */
+async function payPlanItem(id, btn){
+  const item = plansState.find(p=>p.id===id);
+  if(!item) return;
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+
+  const txData = {
+    date: new Date().toISOString().slice(0,10),
+    type: 'Расход',
+    category: 'Другое',
+    amount: Number(item.amount)||0,
+    comment: `${item.kind}: ${item.name}`,
+    shift: '',
+  };
+  let inserted = null;
+  try{ inserted = await insertRow(txData); }
+  catch(err){ console.error('Не удалось сохранить оплату плана в облако (сохранено локально):', err); }
+  txs.push(inserted || { ...txData, id: 'local-' + Date.now() });
+  persistLocalCache();
+
+  item.paid = true;
+  await savePlansState();
+  renderPlansList();
+  render();
+}
+
 function renderPlansList(){
   const box = document.getElementById('planList2');
   if(!box) return;
@@ -817,6 +867,13 @@ function renderPlansList(){
     const row = document.createElement('div');
     row.className = 'tx';
     row.style.opacity = p.paid ? '.5' : '1';
+    // "Оплатить" не просто снимает пункт со счётчика — создаёт настоящую запись
+    // расхода (иначе деньги как бы исчезали в никуда и не попадали ни в статистику,
+    // ни в остаток). "Снять" на уже оплаченном пункте отменяет только отметку —
+    // созданную запись расхода это не удаляет, её можно убрать вручную в "Записях".
+    const actionBtn = p.paid
+      ? `<button class="tx-edit" data-id="${p.id}" data-act="unpay" aria-label="Снять отметку">↺</button>`
+      : `<button class="tx-edit" data-id="${p.id}" data-act="pay" aria-label="Оплатить" style="width:auto;padding:0 10px;font-size:11px;white-space:nowrap;">Оплатить</button>`;
     row.innerHTML = `
       <div class="tx-left">
         <div class="cat">${p.kind}${p.paid ? ' · оплачено' : ''}</div>
@@ -824,17 +881,20 @@ function renderPlansList(){
       </div>
       <div style="display:flex;align-items:center;">
         <span class="tx-amt exp">${fmt(p.amount)}</span>
-        <button class="tx-edit" data-id="${p.id}" data-act="toggle" aria-label="Оплачено">${p.paid?'↺':'✓'}</button>
+        ${actionBtn}
         <button class="tx-del" data-id="${p.id}" data-act="del" aria-label="Удалить">✕</button>
       </div>
     `;
     box.appendChild(row);
   });
-  box.querySelectorAll('[data-act="toggle"]').forEach(btn=>{
+  box.querySelectorAll('[data-act="pay"]').forEach(btn=>{
+    btn.addEventListener('click', ()=> payPlanItem(btn.dataset.id, btn));
+  });
+  box.querySelectorAll('[data-act="unpay"]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const item = plansState.find(p=>p.id===btn.dataset.id);
       if(!item) return;
-      item.paid = !item.paid;
+      item.paid = false;
       await savePlansState();
       renderPlansList();
       render();
@@ -1149,13 +1209,16 @@ function showPage(pageId, push){
 }
 
 /* ===================== Инициализация обработчиков ===================== */
+function openCutPanel(){
+  cutPanelOpen = true;
+  buildCutSliders();
+  document.getElementById('cutPanel').style.display = 'block';
+  document.getElementById('cutOpenBtn').style.display = 'none';
+}
+
 function wireEvents(){
-  document.getElementById('cutOpenBtn').addEventListener('click', ()=>{
-    cutPanelOpen = true;
-    buildCutSliders();
-    document.getElementById('cutPanel').style.display = 'block';
-    document.getElementById('cutOpenBtn').style.display = 'none';
-  });
+  document.getElementById('cutOpenBtn').addEventListener('click', openCutPanel);
+  document.getElementById('cutEditBtn').addEventListener('click', openCutPanel);
   document.getElementById('cutApplyBtn').addEventListener('click', async ()=>{
     const r = computeSpendable();
     const vals = { oblig: r.rawObligLeft, debt: r.rawDebtLeft, goal: r.rawGoalLeft };
