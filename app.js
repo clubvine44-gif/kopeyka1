@@ -569,6 +569,8 @@ function computeSpendable(){
     plansLeft, dolzhenLeft, plannedLeft,
     unpaidDolzhen, unpaidPlanned, reservedTotal,
     paidOblig, obligationsTotal, paidDebtThisMonth, debtTotal: DEBT.monthly,
+    totalIncome, totalExpense, totalSaved, incomeThisMonth, availableThisMonth,
+    debtRemainingTotal, totalGoalMonthly, savedThisMonth,
   };
 }
 
@@ -647,6 +649,41 @@ function renderHero(){
   }
 
   renderUpcoming();
+  renderDebugPanel(r);
+}
+
+function renderDebugPanel(r){
+  const box = document.getElementById('debugPanel');
+  if(!box) return;
+  const mk = currentMonthKey();
+  const obligRows = obligationsState.map(o=>{
+    const paid = o.paidMonth === mk;
+    return `<div class="reserve-row"><span>${o.name}${paid?' ✓':''}</span><span>${fmt(o.amount)}${paid?' (оплачено)':' (не оплачено)'}</span></div>`;
+  }).join('');
+  box.innerHTML = `
+    <div class="reserve-group-title">Баланс</div>
+    <div class="reserve-row"><span>Доход (без накоплений)</span><span>${fmt(r.totalIncome)}</span></div>
+    <div class="reserve-row"><span>Расход</span><span>${fmt(r.totalExpense)}</span></div>
+    <div class="reserve-row"><span>Накопления</span><span>${fmt(r.totalSaved)}</span></div>
+    <div class="reserve-row"><span><b>Баланс сейчас</b></span><span><b>${fmt(r.balance)}</b></span></div>
+    <div class="reserve-row"><span>Зарплата в этом месяце</span><span>${fmt(r.incomeThisMonth)} (${r.payDate.toLocaleDateString('ru-RU')})</span></div>
+    <div class="reserve-row"><span><b>Доступно за месяц</b></span><span><b>${fmt(r.availableThisMonth)}</b></span></div>
+    <div class="reserve-group-title">Обязательные платежи — план ${fmt(r.obligationsTotal)}, осталось ${fmt(r.rawObligLeft)}</div>
+    ${obligRows}
+    <div class="reserve-group-title">Долг</div>
+    <div class="reserve-row"><span>Остаток долга всего</span><span>${fmt(r.debtRemainingTotal)}</span></div>
+    <div class="reserve-row"><span>Оплачено в этом месяце</span><span>${fmt(r.paidDebtThisMonth)}</span></div>
+    <div class="reserve-row"><span>Резерв на этот месяц (после сокращений)</span><span>${fmt(r.debtLeft)}</span></div>
+    <div class="reserve-group-title">Цели</div>
+    <div class="reserve-row"><span>План в месяц</span><span>${fmt(r.totalGoalMonthly)}</span></div>
+    <div class="reserve-row"><span>Отложено в этом месяце</span><span>${fmt(r.savedThisMonth)}</span></div>
+    <div class="reserve-row"><span>Резерв на этот месяц (после сокращений)</span><span>${fmt(r.goalLeft)}</span></div>
+    <div class="reserve-group-title">Должен / Плановая трата (в текущем цикле)</div>
+    <div class="reserve-row"><span>Сумма</span><span>${fmt(r.plansLeft)}</span></div>
+    <div class="reserve-group-title">Итог</div>
+    <div class="reserve-row"><span>Резервы всего (после сокращений)</span><span>${fmt(r.reservedTotal)}</span></div>
+    <div class="reserve-row"><span><b>Дефицит</b></span><span><b>${fmt(r.deficitAmount)}</b></span></div>
+  `;
 }
 
 function reserveRowHtml(name, left, isCut, rawLeft){
