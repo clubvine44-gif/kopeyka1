@@ -226,6 +226,17 @@ function splitRowsIntoState(rows){
 
 function getObligations(){ return obligationsState; }
 function getObligationsTotal(){ return obligationsState.reduce((s,o)=>s+(Number(o.amount)||0),0); }
+// Раньше "оплачено" для обязательных платежей определялось поиском расходов с
+// категорией ровно "Обязательные платежи" на сумму всех платежей разом — но
+// алименты/коммуналку/связь/подписку в жизни логичнее и естественнее заносить
+// каждую своей записью (и часто другой категорией), поэтому это совпадение почти
+// никогда не срабатывало и резерв висел "неоплаченным" постоянно, завышая дефицит.
+// Теперь у каждого платежа своя отметка "оплачено в этом месяце" (paidMonth),
+// как у "Должен"/"Плановая трата".
+function getObligationsLeftTotal(){
+  const mk = currentMonthKey();
+  return obligationsState.reduce((s,o)=> s + (o.paidMonth===mk ? 0 : (Number(o.amount)||0)), 0);
+}
 
 async function saveObligationsSettings(list){
   obligationsState = list;
@@ -500,12 +511,8 @@ function computeSpendable(){
   const monthTxs = txs.filter(t=>{ const d=dateOnly(t.date); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth(); });
 
   const obligationsTotal = getObligationsTotal();
-  const paidOblig = monthTxs.filter(t=>isExpense(t) && t.category==='Обязательные платежи').reduce((s,t)=>s+(Number(t.amount)||0),0);
-  // Раньше после 25 числа "Обязательные платежи" принудительно считались закрытыми
-  // (obligLeft=0) независимо от того, оплачены ли они на самом деле — просто по дате.
-  // Закрытым пункт должен становиться только когда реальные траты в этом месяце
-  // покрыли нужную сумму, а не когда прошёл срок.
-  const obligLeft = Math.max(0, obligationsTotal - paidOblig);
+  const obligLeft = getObligationsLeftTotal();
+  const paidOblig = obligationsTotal - obligLeft;
 
   const paidDebtThisMonth = monthTxs.filter(t=>isExpense(t) && t.category===DEBT.category).reduce((s,t)=>s+(Number(t.amount)||0),0);
   const debtRemainingTotal = DEBT.total - txs.filter(t=>isExpense(t) && t.category===DEBT.category).reduce((s,t)=>s+(Number(t.amount)||0),0);
@@ -807,7 +814,9 @@ function renderObligSettings(){
   const box = document.getElementById('obligList');
   if(!box) return;
   box.innerHTML = '';
+  const mk = currentMonthKey();
   obligationsState.forEach((o, idx)=>{
+    const paid = o.paidMonth === mk;
     const row = document.createElement('div');
     row.className = 'row2';
     row.innerHTML = `
@@ -815,12 +824,60 @@ function renderObligSettings(){
       <input type="number" data-role="amount" data-idx="${idx}" value="${o.amount}" min="0">
     `;
     box.appendChild(row);
-    const del = document.createElement('button');
-    del.type='button'; del.textContent='Удалить платёж'; del.className='tx-del';
-    del.style.cssText='padding:2px 0 8px;color:var(--rust);font-size:12px;';
-    del.addEventListener('click', ()=>{ obligationsState.splice(idx,1); renderObligSettings(); });
-    box.appendChild(del);
+    const statusRow = document.createElement('div');
+    statusRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:2px 0 8px;';
+    statusRow.innerHTML = `
+      <span style="font-size:12px;color:${paid?'var(--sage,#5fbca5)':'var(--muted,#9c9384)'};">${paid ? 'оплачено в этом месяце ✓' : 'не оплачено в этом месяце'}</span>
+      <button type="button" data-act="${paid?'unpay':'pay'}" data-idx="${idx}" class="tx-edit" style="width:auto;padding:0 10px;font-size:11px;white-space:nowrap;">${paid ? 'Снять отметку' : 'Оплатить'}</button>
+      <button type="button" data-act="del" data-idx="${idx}" class="tx-del" style="font-size:12px;color:var(--rust);margin-left:auto;">Удалить</button>
+    `;
+    box.appendChild(statusRow);
   });
+  box.querySelectorAll('[data-act="pay"]').forEach(btn=>{
+    btn.addEventListener('click', ()=> payObligation(Number(btn.dataset.idx), btn));
+  });
+  box.querySelectorAll('[data-act="unpay"]').forEach(btn=>{
+    btn.addEventListener('click', ()=> unpayObligation(Number(btn.dataset.idx)));
+  });
+  box.querySelectorAll('[data-act="del"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ obligationsState.splice(Number(btn.dataset.idx),1); saveObligationsSettings(obligationsState); renderObligSettings(); render(); });
+  });
+}
+
+// "Оплатить" создаёт настоящую запись расхода (иначе деньги пропадали бы в никуда,
+// не попадая в баланс/статистику) и помечает конкретный платёж закрытым на этот
+// месяц. В следующем месяце paidMonth перестаёт совпадать с currentMonthKey() и
+// резерв под этот платёж автоматически появляется заново — ручного сброса не нужно.
+async function payObligation(idx, btn){
+  const o = obligationsState[idx];
+  if(!o) return;
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  const txData = {
+    date: new Date().toISOString().slice(0,10),
+    type: 'Расход',
+    category: 'Обязательные платежи',
+    amount: Number(o.amount)||0,
+    comment: o.name,
+    shift: '',
+  };
+  let inserted = null;
+  try{ inserted = await insertRow(txData); }
+  catch(err){ console.error('Не удалось сохранить оплату обязательного платежа в облако (сохранено локально):', err); }
+  txs.push(inserted || { ...txData, id: 'local-' + Date.now() });
+  persistLocalCache();
+  o.paidMonth = currentMonthKey();
+  await saveObligationsSettings(obligationsState);
+  renderObligSettings();
+  render();
+}
+
+async function unpayObligation(idx){
+  const o = obligationsState[idx];
+  if(!o) return;
+  o.paidMonth = null;
+  await saveObligationsSettings(obligationsState);
+  renderObligSettings();
+  render();
 }
 
 function readObligFormIntoState(){
@@ -830,7 +887,7 @@ function readObligFormIntoState(){
   names.forEach((el,i)=>{
     const amt = Number(amounts[i]?.value)||0;
     const name = el.value.trim();
-    if(name) list.push({ name, amount: amt });
+    if(name) list.push({ name, amount: amt, paidMonth: obligationsState[i] ? obligationsState[i].paidMonth : null });
   });
   return list;
 }
@@ -1283,7 +1340,7 @@ function wireEvents(){
 
   // Настройки: обязательные платежи
   document.getElementById('obligAddBtn').addEventListener('click', ()=>{
-    obligationsState.push({ name:'Новый платёж', amount:0 });
+    obligationsState.push({ name:'Новый платёж', amount:0, paidMonth:null });
     renderObligSettings();
   });
   document.getElementById('obligSaveBtn').addEventListener('click', async ()=>{
