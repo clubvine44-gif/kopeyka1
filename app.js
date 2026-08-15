@@ -14,7 +14,6 @@ const OBLIGATIONS_DEFAULT = [
   {name:"Связь + VPN", amount:700},
   {name:"Подписка Claude", amount:2000},
 ];
-const OBLIGATIONS_DAY = 25;
 const DEBT = { total:70000, monthly:15000, category:"Долг" };
 const GOALS = [
   {name:"Финансовая подушка", target:300000, monthly:5000, keyword:"подушк", priority:"Высокий"},
@@ -502,7 +501,11 @@ function computeSpendable(){
 
   const obligationsTotal = getObligationsTotal();
   const paidOblig = monthTxs.filter(t=>isExpense(t) && t.category==='Обязательные платежи').reduce((s,t)=>s+(Number(t.amount)||0),0);
-  const obligLeft = (today.getDate() < OBLIGATIONS_DAY) ? Math.max(0, obligationsTotal - paidOblig) : 0;
+  // Раньше после 25 числа "Обязательные платежи" принудительно считались закрытыми
+  // (obligLeft=0) независимо от того, оплачены ли они на самом деле — просто по дате.
+  // Закрытым пункт должен становиться только когда реальные траты в этом месяце
+  // покрыли нужную сумму, а не когда прошёл срок.
+  const obligLeft = Math.max(0, obligationsTotal - paidOblig);
 
   const paidDebtThisMonth = monthTxs.filter(t=>isExpense(t) && t.category===DEBT.category).reduce((s,t)=>s+(Number(t.amount)||0),0);
   const debtRemainingTotal = DEBT.total - txs.filter(t=>isExpense(t) && t.category===DEBT.category).reduce((s,t)=>s+(Number(t.amount)||0),0);
