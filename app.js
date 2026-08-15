@@ -277,8 +277,8 @@ async function savePlansState(){
 
 function currentMonthKey(){ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; }
 
-async function saveMonthlyCut(oblig, debt, goal){
-  monthlyCut = { monthKey: currentMonthKey(), oblig, debt, goal, updatedAt: Date.now() };
+async function saveMonthlyCut(oblig, debt, goal, plans){
+  monthlyCut = { monthKey: currentMonthKey(), oblig, debt, goal, plans, updatedAt: Date.now() };
   persistMetaCache();
   const payload = { date: new Date().toISOString().slice(0,10), type: META_TYPE, category: META_CUT_CATEGORY, amount:0, shift:'', comment: JSON.stringify(monthlyCut) };
   try{
@@ -546,7 +546,13 @@ function computeSpendable(){
   const plannedLeft = unpaidPlanned.reduce((s,p)=>s+(Number(p.amount)||0),0);
   const plansLeft = dolzhenLeft + plannedLeft;
 
-  const reservedTotal = obligLeftFinal + debtLeftFinal + goalLeftFinal + plansLeft;
+  const rawPlansLeft = plansLeft;
+  let plansLeftFinal = plansLeft;
+  if(cutActive){
+    plansLeftFinal = Math.min(rawPlansLeft, Math.max(0, Number(monthlyCut.plans)||0));
+  }
+
+  const reservedTotal = obligLeftFinal + debtLeftFinal + goalLeftFinal + plansLeftFinal;
 
   // Резервы (обязательные платежи, "должен" и т.д.) обычно закрываются именно в
   // зарплату — программа уже показывает дату и сумму ближайшей зарплаты рядом с
@@ -566,7 +572,7 @@ function computeSpendable(){
     safeDaily, freeDaily, days, payDate, nextAmount, balance, deficitAmount, cutActive,
     obligLeft: obligLeftFinal, debtLeft: debtLeftFinal, goalLeft: goalLeftFinal,
     rawObligLeft, rawDebtLeft, rawGoalLeft,
-    plansLeft, dolzhenLeft, plannedLeft,
+    plansLeft: plansLeftFinal, rawPlansLeft, dolzhenLeft, plannedLeft,
     unpaidDolzhen, unpaidPlanned, reservedTotal,
     paidOblig, obligationsTotal, paidDebtThisMonth, debtTotal: DEBT.monthly,
     totalIncome, totalExpense, totalSaved, incomeThisMonth, availableThisMonth,
@@ -625,6 +631,7 @@ function renderHero(){
       { name:'Обязательные платежи', left: r.obligLeft, raw: r.rawObligLeft },
       { name:'Долг (в этом месяце)', left: r.debtLeft, raw: r.rawDebtLeft },
       { name:'Цели', left: r.goalLeft, raw: r.rawGoalLeft },
+      { name:'Должен / Плановая трата', left: r.plansLeft, raw: r.rawPlansLeft },
     ];
     const rowsHtml = items.map(it => reserveRowHtml(it.name, it.left, r.cutActive && it.raw > it.left, it.raw)).join('');
 
@@ -679,7 +686,8 @@ function renderDebugPanel(r){
     <div class="reserve-row"><span>Отложено в этом месяце</span><span>${fmt(r.savedThisMonth)}</span></div>
     <div class="reserve-row"><span>Резерв на этот месяц (после сокращений)</span><span>${fmt(r.goalLeft)}</span></div>
     <div class="reserve-group-title">Должен / Плановая трата (в текущем цикле)</div>
-    <div class="reserve-row"><span>Сумма</span><span>${fmt(r.plansLeft)}</span></div>
+    <div class="reserve-row"><span>Сумма (до сокращения)</span><span>${fmt(r.rawPlansLeft)}</span></div>
+    <div class="reserve-row"><span>Сумма (после сокращения)</span><span>${fmt(r.plansLeft)}</span></div>
     <div class="reserve-group-title">Итог</div>
     <div class="reserve-row"><span>Резервы всего (после сокращений)</span><span>${fmt(r.reservedTotal)}</span></div>
     <div class="reserve-row"><span><b>Дефицит</b></span><span><b>${fmt(r.deficitAmount)}</b></span></div>
@@ -726,15 +734,17 @@ function buildCutSliders(){
     oblig: r.cutActive ? Math.min(r.rawObligLeft, Number(monthlyCut.oblig)||0) : r.rawObligLeft,
     debt: r.cutActive ? Math.min(r.rawDebtLeft, Number(monthlyCut.debt)||0) : r.rawDebtLeft,
     goal: r.cutActive ? Math.min(r.rawGoalLeft, Number(monthlyCut.goal)||0) : r.rawGoalLeft,
+    plans: r.cutActive ? Math.min(r.rawPlansLeft, Number(monthlyCut.plans)||0) : r.rawPlansLeft,
   };
   const rows = [
     { key:'oblig', label:'Обязательные платежи', max:r.rawObligLeft, val:current.oblig },
     { key:'debt', label:'Долг', max:r.rawDebtLeft, val:current.debt },
     { key:'goal', label:'Цели', max:r.rawGoalLeft, val:current.goal },
+    { key:'plans', label:'Должен / Плановая трата', max:r.rawPlansLeft, val:current.plans },
   ].filter(row => row.max > 0);
 
   if(!rows.length){
-    box.innerHTML = '<div class="empty">Резервировать нечего — весь дефицит из-за долга по "должен"/плановым тратам ниже, отредактируй их в Настройках.</div>';
+    box.innerHTML = '<div class="empty">Сокращать нечего — все резервы уже нулевые.</div>';
     updateCutFreedPreview();
     return;
   }
@@ -756,7 +766,7 @@ function updateCutFreedPreview(){
   const box = document.getElementById('cutSliders');
   const freedEl = document.getElementById('cutFreed');
   if(!box || !freedEl) return;
-  const rawMap = { oblig: r.rawObligLeft, debt: r.rawDebtLeft, goal: r.rawGoalLeft };
+  const rawMap = { oblig: r.rawObligLeft, debt: r.rawDebtLeft, goal: r.rawGoalLeft, plans: r.rawPlansLeft };
   let freed = 0;
   box.querySelectorAll('input[type="range"]').forEach(inp=>{
     const key = inp.dataset.key;
@@ -1335,11 +1345,11 @@ function wireEvents(){
   document.getElementById('cutEditBtn').addEventListener('click', openCutPanel);
   document.getElementById('cutApplyBtn').addEventListener('click', async ()=>{
     const r = computeSpendable();
-    const vals = { oblig: r.rawObligLeft, debt: r.rawDebtLeft, goal: r.rawGoalLeft };
+    const vals = { oblig: r.rawObligLeft, debt: r.rawDebtLeft, goal: r.rawGoalLeft, plans: r.rawPlansLeft };
     document.querySelectorAll('#cutSliders input[type="range"]').forEach(inp=>{ vals[inp.dataset.key] = Number(inp.value); });
     const btn = document.getElementById('cutApplyBtn');
     btn.disabled = true; btn.textContent = 'Сохраняю…';
-    await saveMonthlyCut(vals.oblig, vals.debt, vals.goal);
+    await saveMonthlyCut(vals.oblig, vals.debt, vals.goal, vals.plans);
     cutPanelOpen = false;
     btn.disabled = false; btn.textContent = 'Применить на этот месяц';
     render();
