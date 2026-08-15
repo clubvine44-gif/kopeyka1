@@ -435,6 +435,20 @@
       </form>
       <div id="planList2" style="margin-top:14px;display:flex;flex-direction:column;gap:0;"></div>
     </section>
+
+    <section>
+      <h2>Полный сброс</h2>
+      <div class="hint">
+        Важно: удаление записей в «Последних записях» стирает только сами операции
+        дохода/расхода. Статус оплаты обязательных платежей и список «Должен»/«Плановая
+        трата» хранятся отдельно (здесь, в Настройках) и не удаляются вместе с записями —
+        поэтому дефицит может «оставаться прежним» даже после чистки списка операций.
+        Кнопка ниже сбрасывает всё сразу: все операции, отметки оплаты, «Должен»/«Плановая
+        трата» и активное сокращение месяца.
+      </div>
+      <button type="button" class="submit-btn" id="fullResetBtn" style="margin-top:10px;background:#4a1f1f;border:1px solid var(--rust);">Сбросить всё (операции + резервы)</button>
+      <div class="hint" id="fullResetStatus" style="margin-top:6px;margin-bottom:0;"></div>
+    </section>
   </div>
 
   <!-- ============ DEBT & GOALS ============ -->

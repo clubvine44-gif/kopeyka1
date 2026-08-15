@@ -1402,6 +1402,33 @@ function wireEvents(){
     setTimeout(()=>{ status.textContent=''; }, 3000);
   });
 
+  document.getElementById('fullResetBtn').addEventListener('click', async ()=>{
+    if(!confirm('Точно стереть ВСЁ: все операции, отметки оплаты обязательных платежей, весь список «Должен»/«Плановая трата» и активное сокращение месяца? Отменить нельзя.')) return;
+    const status = document.getElementById('fullResetStatus');
+    status.textContent = 'Стираю…';
+    // Операции — удаляем на сервере по одной, чтобы не потерять несинхронизированные.
+    for(const t of [...txs]){
+      if(!String(t.id).startsWith('local-')){
+        try{ await deleteRow(t.id); }catch(e){ console.error('Не удалось удалить операцию', t.id, e); }
+      }
+    }
+    txs = [];
+    persistLocalCache();
+    // Резервы — сбрасываем отметки оплаты, но названия/суммы платежей оставляем.
+    obligationsState = obligationsState.map(o=>({ ...o, paidMonth: null }));
+    plansState = [];
+    monthlyCut = null;
+    await saveObligationsSettings(obligationsState);
+    await savePlansState();
+    await resetMonthlyCut();
+    persistMetaCache();
+    status.textContent = 'Сброшено ✓';
+    renderObligSettings();
+    renderPlansList();
+    render();
+    setTimeout(()=>{ status.textContent=''; }, 3000);
+  });
+
   // Настройки: «Должен» / «Плановая трата»
   document.querySelectorAll('#planForm .type-toggle button[data-kind]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
