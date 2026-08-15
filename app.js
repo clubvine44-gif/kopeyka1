@@ -527,8 +527,14 @@ function computeSpendable(){
     goalLeftFinal = Math.min(rawGoalLeft, Math.max(0, Number(monthlyCut.goal)||0));
   }
 
-  const unpaidDolzhen = plansState.filter(p => !p.paid && p.kind === 'Должен');
-  const unpaidPlanned = plansState.filter(p => !p.paid && p.kind === 'Плановая трата');
+  // "В текущем цикле" = срок наступил или наступит до конца этого месяца (включая
+  // просроченные — они точно ещё не закрыты). Плановые траты/долги со сроком в
+  // будущих месяцах в резерв текущего месяца не входят — иначе добавление дальней
+  // записи мгновенно и неверно занижало бы сегодняшний лимит трат.
+  const endOfCurrentMonth = new Date(today.getFullYear(), today.getMonth()+1, 0);
+  const inCurrentCycle = p => dateOnly(p.dueDate) <= endOfCurrentMonth;
+  const unpaidDolzhen = plansState.filter(p => !p.paid && p.kind === 'Должен' && inCurrentCycle(p));
+  const unpaidPlanned = plansState.filter(p => !p.paid && p.kind === 'Плановая трата' && inCurrentCycle(p));
   const dolzhenLeft = unpaidDolzhen.reduce((s,p)=>s+(Number(p.amount)||0),0);
   const plannedLeft = unpaidPlanned.reduce((s,p)=>s+(Number(p.amount)||0),0);
   const plansLeft = dolzhenLeft + plannedLeft;
