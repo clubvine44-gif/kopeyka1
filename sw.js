@@ -1,38 +1,13 @@
-const CACHE_NAME = 'kopeyka-cache-v3';
+const CACHE_NAME = 'kopeyka-cache-v4';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './fixes.js'];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).catch(() => {}));
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))));
-  self.clients.claim();
-});
-
-async function injectFixes(response) {
-  if (!response || !response.ok) return response;
-  const type = response.headers.get('content-type') || '';
-  if (!type.includes('text/html')) return response;
-  const text = await response.text();
-  if (text.includes('./fixes.js')) return new Response(text, {status:response.status,statusText:response.statusText,headers:response.headers});
-  const patched = text.replace('</body>', '<script src="./fixes.js"></script>\n</body>');
-  const headers = new Headers(response.headers);
-  headers.delete('content-length');
-  return new Response(patched, {status:response.status,statusText:response.statusText,headers});
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS)).catch(()=>{}));self.skipWaiting();});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));self.clients.claim();});
+async function patchIndex(response){
+  const text0=await response.text(); let text=text0;
+  text=text.replace(/const MONTHLY_INCOME\s*=\s*98000\s*;/g,'const MONTHLY_INCOME = 0;');
+  text=text.replace(/const SHIFT_RATE\s*=\s*4800\s*;/g,'const SHIFT_RATE = 0;');
+  text=text.replace(/const amt = shiftIncomeAmount\(sh\);\s*if\(sh\.status==='worked'\) actualShiftIncome\+=amt;\s*else if\(sh\.status==='planned'\) expectedShiftIncome\+=amt;/g,'const amt = 0;');
+  if(!text.includes('fixes.js?v=4')) text=text.replace('</body>','<script src="./fixes.js?v=4"></script>\n</body>');
+  const h=new Headers(response.headers);h.delete('content-length');return new Response(text,{status:response.status,statusText:response.statusText,headers:h});
 }
-
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  event.respondWith((async () => {
-    let response = await caches.match(event.request);
-    if (!response) {
-      try { response = await fetch(event.request); }
-      catch (_) { return response || Response.error(); }
-    }
-    if (event.request.mode === 'navigate') response = await injectFixes(response);
-    if (response && response.status === 200) caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone())).catch(() => {});
-    return response;
-  })());
-});
+self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith((async()=>{let r;try{r=await fetch(e.request,{cache:'no-store'});}catch(_){r=await caches.match(e.request);}if(!r)return Response.error();if(e.request.mode==='navigate'&&r.ok)r=await patchIndex(r);if(r.ok)caches.open(CACHE_NAME).then(c=>c.put(e.request,r.clone())).catch(()=>{});return r;})());});
