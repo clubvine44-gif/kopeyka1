@@ -1,5 +1,5 @@
-const CACHE_NAME = 'kopeyka-cache-v1';
-const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
+const CACHE_NAME = 'kopeyka-cache-v2';
+const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './fixes.js'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -17,20 +17,31 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+async function injectFixes(response) {
+  if (!response || !response.ok) return response;
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('text/html')) return response;
+  const text = await response.text();
+  if (text.includes('./fixes.js')) return new Response(text, {status: response.status, statusText: response.statusText, headers: response.headers});
+  const patched = text.replace('</body>', '<script src="./fixes.js"></script>\n</body>');
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  return new Response(patched, {status: response.status, statusText: response.statusText, headers});
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
-  );
+  event.respondWith((async () => {
+    let response = await caches.match(event.request);
+    if (!response) {
+      try { response = await fetch(event.request); }
+      catch (_) { return response || Response.error(); }
+    }
+    if (event.request.mode === 'navigate') response = await injectFixes(response);
+    if (response && response.status === 200) {
+      const clone = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+    }
+    return response;
+  })());
 });
