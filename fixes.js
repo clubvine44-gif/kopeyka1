@@ -1,16 +1,63 @@
-/* Копейка — единая логика доходов + мобильная навигация */
+/* KOPEYKA FIX CORE v3: manual income only + cloud + mobile UI */
 (function(){
 'use strict';
-const num=v=>Number(v)||0;
-const fmt=n=>Math.round(num(n)).toLocaleString('ru-RU')+' ₽';
-function period(){try{return typeof currentPeriod==='function'?currentPeriod():{start:'0000-01-01',end:'9999-12-31'}}catch(_){return{start:'0000-01-01',end:'9999-12-31'}}}
-function manualIncome(start,end){const list=Array.isArray(window.STATE?.income)?STATE.income:[];let actual=0,planned=0;list.forEach(i=>{if(!i||i.date<start||i.date>end)return;const a=num(i.amount);if(['expected','planned','forecast'].includes(i.status))planned+=a;else actual+=a});return{actual,planned,total:actual+planned}}
-function summary(start,end){const inc=manualIncome(start,end),t=new Date().toISOString().slice(0,10);let ar=0,pr=0,ao=0,po=0;const expenses=Array.isArray(window.STATE?.expenses)?STATE.expenses:[];expenses.forEach(e=>{if(!e||e.date<start||e.date>end)return;const a=num(e.amount),future=e.date>t;if(e.mandatory)future?po+=a:ao+=a;else future?pr+=a:ar+=a});const recurring=Array.isArray(window.STATE?.recurring)?STATE.recurring:[];recurring.filter(r=>r.active).forEach(r=>{try{occurrencesInRange(r,start,end).forEach(dt=>{const a=num(r.amount);dt>t?po+=a:ao+=a})}catch(_){}});const balance=num(window.STATE?.settings?.currentBalance);const reserves=Array.isArray(window.STATE?.reserves)?STATE.reserves.filter(r=>r.active).reduce((s,r)=>{try{return s+num(reserveRawNeed(r,start,end,inc.total))}catch(_){return s}},0):0;const spend=Math.max(0,balance+inc.actual-ar-ao),forecast=Math.max(0,balance+inc.actual+inc.planned-ar-ao-pr-po),strict=Math.max(0,balance+inc.actual-ar-ao-pr-po-reserves);const days=Math.max(1,Math.ceil((new Date(end)-new Date(t>start?t:start))/86400000)+1);return{actualIncome:inc.actual,expectedIncome:inc.planned,totalIncome:inc.total,currentBalance:balance,availableNow:spend,forecastAfterReserves:Math.max(0,forecast-reserves),strictAvailable:strict,safeLimit:Math.round(Math.max(0,forecast-reserves)/days),strictLimit:Math.round(strict/days),actualRegular:ar,plannedRegular:pr,actualObligatory:ao,plannedObligatory:po,reservesNeeded:reserves,actualShiftIncome:0,expectedShiftIncome:0,shiftsList:[],totalRegular:ar+pr,totalObligatory:ao+po};}
-window.computePeriodSummary=summary;
-window.getStrictAvailable=s=>Math.max(0,num(s?.currentBalance)+num(s?.actualIncome)-num(s?.actualRegular)-num(s?.actualObligatory)-num(s?.plannedRegular)-num(s?.plannedObligatory)-num(s?.reservesNeeded));
-window.renderIncome=function(){const p=period(),s=summary(p.start,p.end),list=(Array.isArray(STATE.income)?STATE.income:[]).filter(i=>i.date>=p.start&&i.date<=p.end).sort((a,b)=>String(b.date).localeCompare(String(a.date)));let h='<div class="grid2">';h+=statCard('Получено',fmt(s.actualIncome),'только введённый доход');h+=statCard('Ожидается',fmt(s.expectedIncome),'только введённый прогноз');h+='</div><div class="card" style="text-align:center"><div class="label">Доход за период</div><div class="mid-number">'+fmt(s.totalIncome)+'</div><div class="faint" style="margin-top:5px">Смены не создают доход автоматически.</div></div><div class="section-title">Введённый доход</div><div class="card">';if(!list.length)h+=emptyState('Доходов пока нет.','&#128176;');else list.forEach(i=>h+=itemRow('&#128181;',i.title||'Доход',fmtDateHuman(i.date)+' · '+(['expected','planned','forecast'].includes(i.status)?'ожидается':'получено'),fmt(i.amount),'income:'+i.id));h+='</div>';document.getElementById('main').innerHTML=h;bindListClicks()};
-try{window.SHIFT_RATE=0;window.MONTHLY_INCOME=0;}catch(_){ }
-const css=document.createElement('style');css.textContent=`@media(max-width:899px){#main{padding-left:12px!important;padding-right:12px!important;padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))!important}.bottomnav{display:flex!important;position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;z-index:100!important;min-height:68px!important;height:auto!important;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))!important;gap:2px!important;justify-content:space-between!important;align-items:stretch!important;background:var(--surface)!important;border-top:1px solid var(--border)!important}.navbtn{box-sizing:border-box!important;display:flex!important;flex:1 1 0!important;width:20%!important;min-width:0!important;max-width:20%!important;padding:5px 2px!important;gap:3px!important;align-items:center!important;justify-content:center!important;font-size:10px!important;line-height:1.05!important;white-space:nowrap!important;overflow:hidden!important}.navbtn svg{width:21px!important;height:21px!important;flex:none!important}.navbtn span{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important}.fab{bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}.toast{bottom:calc(88px + env(safe-area-inset-bottom,0px))!important}.card{overflow:hidden}.row{min-width:0}.mid-number,.big-number,.mono{font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}.item .body{min-width:0}.item .amt{font-size:13px!important;flex:none}@media(max-width:370px){.navbtn{font-size:8.5px!important}.navbtn svg{width:19px!important;height:19px!important}}}`;document.head.appendChild(css);
-/* The main document does not load this file before its first render, so force one clean render now. */
-try{if(typeof render==='function'){render();}}catch(e){console.error('Kopeyka fixes render:',e)}
+const SB_URL='https://cqslrfphsjllhltsvvuq.supabase.co';
+const SB_KEY='sb_publishable_cM_XCycYRFLIc6qEqlH83Q_5XY6kPzG';
+const H={apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json'};
+const META='__state_v2__';
+const n=v=>Number(v)||0;
+const today=()=>new Date().toISOString().slice(0,10);
+const money=v=>Math.round(n(v)).toLocaleString('ru-RU')+' ₽';
+const original=window.computePeriodSummary;
+let cloudId=null,cloudReady=false,syncing=false,lastCloud='';
+
+function incomeFor(start,end){
+  let actual=0,expected=0;
+  (window.STATE?.income||[]).forEach(i=>{
+    if(!i||i.date<start||i.date>end)return;
+    const a=n(i.amount);
+    if(['expected','planned','forecast'].includes(i.status)) expected+=a; else actual+=a;
+  });
+  return {actual,expected,total:actual+expected};
+}
+function correctedSummary(state,start,end){
+  const base=original?original(state,start,end):{};
+  const inc=incomeFor(start,end),t=today();
+  let ar=0,pr=0,ao=0,po=0;
+  (state.expenses||[]).forEach(e=>{if(!e||e.date<start||e.date>end)return;const a=n(e.amount);if(e.mandatory)e.date>t?po+=a:ao+=a;else e.date>t?pr+=a:ar+=a});
+  (state.recurring||[]).filter(r=>r.active).forEach(r=>{try{occurrencesInRange(r,start,end).forEach(d=>{const a=n(r.amount);d>t?po+=a:ao+=a})}catch(_){}});
+  let reservesNeeded=0,reserveBreakdown=[];
+  (state.reserves||[]).filter(r=>r.active).forEach(r=>{let need=0;try{need=n(reserveRawNeed(r,start,end,inc.total))}catch(_){}reservesNeeded+=need;reserveBreakdown.push({reserve:r,need})});
+  const balance=n(state.settings?.currentBalance);
+  const spendable=Math.max(0,balance+inc.actual-ar-ao);
+  const forecast=Math.max(0,balance+inc.actual+inc.expected-ar-ao-pr-po);
+  const safe=Math.max(0,forecast-reservesNeeded);
+  const strict=Math.max(0,balance+inc.actual-ar-ao-pr-po-reservesNeeded);
+  const remaining=Math.max(1,diffDays(t>start?t:start,end)+1);
+  let pool=Math.max(0,forecast);
+  const allocation=reserveBreakdown.slice().sort((a,b)=>(a.reserve.priority||99)-(b.reserve.priority||99)).map(x=>{const a=Math.min(x.need,pool);pool-=a;return{reserve:x.reserve,need:x.need,allocated:a,deficit:x.need-a}});
+  return Object.assign({},base,{periodStart:start,periodEnd:end,remainingDays:remaining,shiftsList:[],actualShiftIncome:0,expectedShiftIncome:0,actualManualIncome:inc.actual,expectedManualIncome:inc.expected,actualIncome:inc.actual,expectedIncome:inc.expected,totalIncome:inc.total,actualRegular:ar,plannedRegular:pr,totalRegular:ar+pr,actualObligatory:ao,plannedObligatory:po,totalObligatory:ao+po,reservesNeeded,reserveBreakdown,allocation,currentBalance:balance,availableNow:spendable,forecastBeforeReserves:forecast,forecastAfterReserves:safe,strictAvailable:strict,noReserveLimit:Math.round(forecast/remaining),safeLimit:Math.round(safe/remaining),strictLimit:Math.round(strict/remaining)});
+}
+window.computePeriodSummary=correctedSummary;
+window.getStrictAvailable=s=>Math.max(0,n(s?.currentBalance)+n(s?.actualIncome)-n(s?.actualRegular)-n(s?.actualObligatory)-n(s?.plannedRegular)-n(s?.plannedObligatory)-n(s?.reservesNeeded));
+try{window.SHIFT_RATE=0;window.MONTHLY_INCOME=0}catch(_){}
+
+/* Reset the broken automatic-income state once. Manual entries start clean at 0. */
+const RESET_KEY='kopeyka_manual_income_reset_v3';
+let freshReset=false;
+try{if(!localStorage.getItem(RESET_KEY)){STATE.income=[];STATE.settings.currentBalance=0;localStorage.setItem(RESET_KEY,'1');saveState();freshReset=true}}catch(_){}
+
+/* Mobile navigation: five equal columns, safe-area aware, no overflow. */
+const st=document.createElement('style');st.textContent=`@media(max-width:899px){#main{padding:14px 12px calc(94px + env(safe-area-inset-bottom,0px))!important}.bottomnav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;z-index:100!important;display:flex!important;justify-content:space-between!important;align-items:stretch!important;gap:2px!important;padding:5px 3px calc(5px + env(safe-area-inset-bottom,0px))!important;min-height:66px!important;background:var(--surface)!important;border-top:1px solid var(--border)!important;overflow:hidden!important}.navbtn{box-sizing:border-box!important;flex:1 1 0!important;width:0!important;min-width:0!important;max-width:none!important;padding:5px 2px!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:3px!important;font-size:clamp(8.5px,2.65vw,10.5px)!important;line-height:1.05!important;white-space:nowrap!important;overflow:hidden!important}.navbtn svg{width:21px!important;height:21px!important;flex:none!important}.navbtn span{display:block!important;min-width:0!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important}.fab{bottom:calc(76px + env(safe-area-inset-bottom,0px))!important}.toast{bottom:calc(82px + env(safe-area-inset-bottom,0px))!important}.grid2{grid-template-columns:1fr 1fr!important;gap:8px!important}.card{padding:15px!important}.item .body{min-width:0!important}.item .amt{font-size:13px!important;flex:none!important}.big-number{font-size:34px!important}.mid-number{font-size:20px!important}}@media(max-width:360px){.navbtn{font-size:8px!important}.navbtn svg{width:19px!important;height:19px!important}.card{padding:13px!important}}`;document.head.appendChild(st);
+
+/* Cloud sync: restore saved state only when local state is genuinely empty; after the one-time reset, push zeros instead. */
+function cloudStatus(ok){window.cloudOnline=!!ok;const d=document.getElementById('syncDot'),x=document.getElementById('syncText');if(d)d.className='sync-dot '+(ok?'online':'offline');if(x)x.textContent=ok?'в облаке':'только локально'}
+async function cloudGet(){const r=await fetch(SB_URL+'/rest/v1/transactions?select=id,date,type,category,amount,shift,comment&category=eq.'+encodeURIComponent(META)+'&order=id.desc&limit=1',{headers:H,cache:'no-store'});if(!r.ok)throw Error('Supabase '+r.status);const a=await r.json();return a[0]||null}
+async function cloudPut(){if(!window.STATE||syncing)return;const json=JSON.stringify(STATE);if(json===lastCloud)return;syncing=true;try{const payload={date:today(),type:'Meta',category:META,amount:0,shift:'',comment:JSON.stringify({version:3,state:JSON.parse(json),updatedAt:Date.now()})};let r;if(cloudId)r=await fetch(SB_URL+'/rest/v1/transactions?id=eq.'+encodeURIComponent(cloudId),{method:'PATCH',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(payload)});else r=await fetch(SB_URL+'/rest/v1/transactions',{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(payload)});if(!r.ok)throw Error('Supabase '+r.status);const rows=await r.json();if(rows[0])cloudId=rows[0].id;lastCloud=json;cloudStatus(true)}catch(e){console.warn('Cloud sync:',e);cloudStatus(false)}finally{syncing=false}}
+async function cloudLoad(){try{const row=await cloudGet();cloudStatus(true);if(row)cloudId=row.id;const remote=row?.comment?JSON.parse(row.comment).state:null;if(freshReset){cloudReady=true;await cloudPut();return}if(remote&&typeof remote==='object'){const meaningful=!((STATE.income||[]).length||(STATE.expenses||[]).length||(STATE.reserves||[]).length||(STATE.recurring||[]).length);if(meaningful){Object.keys(remote).forEach(k=>STATE[k]=remote[k]);saveState();}}cloudReady=true;lastCloud=JSON.stringify(STATE);if(typeof render==='function')render()}catch(e){cloudStatus(false);cloudReady=true;console.warn('Cloud unavailable:',e)}}
+setInterval(()=>{if(!cloudReady||!window.STATE)return;const j=JSON.stringify(STATE);if(j!==lastCloud)cloudPut()},2500);
+window.addEventListener('online',()=>cloudPut());
+function boot(){if(window.STATE)cloudLoad();else setTimeout(boot,100)}
+boot();
+setTimeout(()=>{try{if(typeof render==='function')render()}catch(e){console.error(e)}},0);
 })();
