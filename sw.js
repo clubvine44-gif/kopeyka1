@@ -1,10 +1,11 @@
-const CACHE_NAME='kopeyka-cloud-v22';
+const CACHE_NAME='kopeyka-cloud-v23';
 function patch(html){
  html=html.replace(/function shiftIncomeAmount\(shift\)\s*\{[\s\S]*?\n\}/m,'function shiftIncomeAmount(shift){ return 0; }');
  html=html.replace(/<script src="\.\/fixes\.js\?v=[^"]+"><\/script>/g,'');
- if(!html.includes('cloud-loader.js')) html=html.replace('</body>','<script src="./cloud-loader.js?v=1"></script><script src="./finance-core.js?v=4"></script><script src="./ui-finance-v4.js?v=2"></script><script src="./ui-balance-fix.js?v=2"></script></body>');
- const css='<style id="kopeyka-ui-v22">@media(max-width:899px){#main{padding-bottom:100px!important}.bottomnav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;z-index:9999!important;display:flex!important;width:100%!important;min-height:70px!important}.navbtn{flex:1 1 0!important;width:0!important;min-width:0!important;display:flex!important;align-items:center!important;justify-content:center!important}}</style>';
- if(!html.includes('kopeyka-ui-v22'))html=html.replace('</head>',css+'</head>'); return html;
+ html=html.replace(/<script src="\.\/cloud-loader\.js\?v=[^"]+"><\/script>/g,'');
+ if(!html.includes('auth-cloud.js')) html=html.replace('</body>','<script src="./auth-cloud.js?v=3"></script><script src="./finance-core.js?v=4"></script><script src="./ui-finance-v4.js?v=2"></script><script src="./ui-balance-fix.js?v=2"></script></body>');
+ const css='<style id="kopeyka-ui-v23">@media(max-width:899px){#main{padding-bottom:100px!important}.bottomnav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;z-index:9999!important;display:flex!important;width:100%!important;min-height:70px!important}.navbtn{flex:1 1 0!important;width:0!important;min-width:0!important;display:flex!important;align-items:center!important;justify-content:center!important}}</style>';
+ if(!html.includes('kopeyka-ui-v23'))html=html.replace('</head>',css+'</head>'); return html;
 }
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.add('./')).catch(()=>{}));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));self.clients.claim()});
