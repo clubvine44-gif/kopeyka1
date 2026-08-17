@@ -1,4 +1,4 @@
-const CACHE_NAME='kopeyka-root-v11';
+const CACHE_NAME='kopeyka-root-v12';
 function patch(html){
   html=html.replace(/function shiftIncomeAmount\(shift\)\s*\{[\s\S]*?\n\}/m,'function shiftIncomeAmount(shift){ return 0; }');
   html=html.replace(/let actualShiftIncome=0, expectedShiftIncome=0;[\s\S]*?const actualIncome = actualShiftIncome\+actualManualIncome;\s*const expectedIncome = expectedShiftIncome\+expectedManualIncome;\s*const totalIncome = actualIncome\+expectedIncome;/m,`let actualShiftIncome=0, expectedShiftIncome=0;
@@ -12,7 +12,38 @@ function patch(html){
   const actualIncome=actualManualIncome;
   const expectedIncome=expectedManualIncome;
   const totalIncome=actualIncome+expectedIncome;`);
-  const bridge=`<script>(function(){try{const wrap=window.computePeriodSummary;if(typeof wrap==='function'&&!wrap.__cashBridge){const f=wrap;window.computePeriodSummary=function(state,start,end){const s=f(state,start,end)||{};let actual=0;(state&&state.income||[]).forEach(i=>{if(i&&i.date>=start&&i.date<=end&&i.status==='actual')actual+=Number(i.amount)||0});const base=Number(state&&state.settings&&state.settings.currentBalance)||0;s.currentBalance=base+actual;s.actualIncome=actual;s.actualManualIncome=actual;s.actualShiftIncome=0;return s};window.computePeriodSummary.__cashBridge=true;try{if(typeof render==='function')render()}catch(e){}}}catch(e){console.warn('cash bridge',e)}})();</script>`;
+  const bridge=`<script>(function(){try{
+    const income=(state)=>{let a=0;(state&&state.income||[]).forEach(i=>{if(i&&i.status==='actual')a+=Number(i.amount)||0});return a};
+    const wrap=window.computePeriodSummary;
+    if(typeof wrap==='function'&&!wrap.__cashBridge){
+      const f=wrap;
+      window.computePeriodSummary=function(state,start,end){
+        const s=f(state,start,end)||{};
+        let actual=0;(state&&state.income||[]).forEach(i=>{if(i&&i.date>=start&&i.date<=end&&i.status==='actual')actual+=Number(i.amount)||0});
+        const base=Number(state&&state.settings&&state.settings.currentBalance)||0;
+        /* currentBalance in the UI means cash available after recorded income; it must not mutate the stored base. */
+        s.baseCurrentBalance=base;s.currentBalance=base+actual;s.actualIncome=actual;s.actualManualIncome=actual;s.actualShiftIncome=0;
+        s.availableNow=Math.max(0,s.currentBalance-(Number(s.actualRegular)||0)-(Number(s.actualObligatory)||0));
+        return s;
+      };
+      window.computePeriodSummary.__cashBridge=true;
+    }
+    /* Reserve calculations in the original app read STATE.settings.currentBalance directly. Give them the same effective value during rendering, then restore the stored base immediately. */
+    const originalRender=window.render;
+    if(typeof originalRender==='function'&&!originalRender.__cashBridge){
+      const r=originalRender;
+      window.render=function(){
+        const st=window.STATE; if(st&&st.settings){
+          const base=Number(st.settings.__baseCurrentBalance ?? st.settings.currentBalance)||0;
+          if(st.settings.__baseCurrentBalance==null)st.settings.__baseCurrentBalance=base;
+          const actual=income(st); st.settings.currentBalance=base+actual;
+          try{return r.apply(this,arguments)}finally{st.settings.currentBalance=base}
+        }
+        return r.apply(this,arguments);
+      };window.render.__cashBridge=true;
+    }
+    try{if(typeof render==='function')render()}catch(e){}
+  }catch(e){console.warn('cash bridge',e)}})();</script>`;
   html=html.replace('</body>',bridge+'</body>');
   return html;
 }
