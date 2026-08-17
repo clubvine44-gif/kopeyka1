@@ -1,52 +1,8 @@
-const CACHE_NAME='kopeyka-root-v12';
+const CACHE_NAME='kopeyka-root-v13';
 function patch(html){
-  html=html.replace(/function shiftIncomeAmount\(shift\)\s*\{[\s\S]*?\n\}/m,'function shiftIncomeAmount(shift){ return 0; }');
-  html=html.replace(/let actualShiftIncome=0, expectedShiftIncome=0;[\s\S]*?const actualIncome = actualShiftIncome\+actualManualIncome;\s*const expectedIncome = expectedShiftIncome\+expectedManualIncome;\s*const totalIncome = actualIncome\+expectedIncome;/m,`let actualShiftIncome=0, expectedShiftIncome=0;
-  let d=periodStart; const shiftsList=[];
-  while(d<=periodEnd){ const sh=getShift(d,state); sh.amount=0; shiftsList.push(sh); d=addDays(d,1); }
-  let actualManualIncome=0, expectedManualIncome=0;
-  (state.income||[]).filter(i=>i&&i.date>=periodStart&&i.date<=periodEnd).forEach(i=>{
-    const amount=Number(i.amount)||0;
-    if(i.status==='actual') actualManualIncome+=amount; else expectedManualIncome+=amount;
-  });
-  const actualIncome=actualManualIncome;
-  const expectedIncome=expectedManualIncome;
-  const totalIncome=actualIncome+expectedIncome;`);
-  const bridge=`<script>(function(){try{
-    const income=(state)=>{let a=0;(state&&state.income||[]).forEach(i=>{if(i&&i.status==='actual')a+=Number(i.amount)||0});return a};
-    const wrap=window.computePeriodSummary;
-    if(typeof wrap==='function'&&!wrap.__cashBridge){
-      const f=wrap;
-      window.computePeriodSummary=function(state,start,end){
-        const s=f(state,start,end)||{};
-        let actual=0;(state&&state.income||[]).forEach(i=>{if(i&&i.date>=start&&i.date<=end&&i.status==='actual')actual+=Number(i.amount)||0});
-        const base=Number(state&&state.settings&&state.settings.currentBalance)||0;
-        /* currentBalance in the UI means cash available after recorded income; it must not mutate the stored base. */
-        s.baseCurrentBalance=base;s.currentBalance=base+actual;s.actualIncome=actual;s.actualManualIncome=actual;s.actualShiftIncome=0;
-        s.availableNow=Math.max(0,s.currentBalance-(Number(s.actualRegular)||0)-(Number(s.actualObligatory)||0));
-        return s;
-      };
-      window.computePeriodSummary.__cashBridge=true;
-    }
-    /* Reserve calculations in the original app read STATE.settings.currentBalance directly. Give them the same effective value during rendering, then restore the stored base immediately. */
-    const originalRender=window.render;
-    if(typeof originalRender==='function'&&!originalRender.__cashBridge){
-      const r=originalRender;
-      window.render=function(){
-        const st=window.STATE; if(st&&st.settings){
-          const base=Number(st.settings.__baseCurrentBalance ?? st.settings.currentBalance)||0;
-          if(st.settings.__baseCurrentBalance==null)st.settings.__baseCurrentBalance=base;
-          const actual=income(st); st.settings.currentBalance=base+actual;
-          try{return r.apply(this,arguments)}finally{st.settings.currentBalance=base}
-        }
-        return r.apply(this,arguments);
-      };window.render.__cashBridge=true;
-    }
-    try{if(typeof render==='function')render()}catch(e){}
-  }catch(e){console.warn('cash bridge',e)}})();</script>`;
-  html=html.replace('</body>',bridge+'</body>');
-  return html;
-}
+html=html.replace(/function shiftIncomeAmount\(shift\)\s*\{[\s\S]*?\n\}/m,'function shiftIncomeAmount(shift){ return 0; }');
+html=html.replace(/let actualShiftIncome=0, expectedShiftIncome=0;[\s\S]*?const actualIncome = actualShiftIncome\+actualManualIncome;\s*const expectedIncome = expectedShiftIncome\+expectedManualIncome;\s*const totalIncome = actualIncome\+expectedIncome;/m,`let actualShiftIncome=0, expectedShiftIncome=0; let d=periodStart; const shiftsList=[]; while(d<=periodEnd){ const sh=getShift(d,state); sh.amount=0; shiftsList.push(sh); d=addDays(d,1); } let actualManualIncome=0, expectedManualIncome=0; (state.income||[]).filter(i=>i&&i.date>=periodStart&&i.date<=periodEnd).forEach(i=>{const amount=Number(i.amount)||0;if(i.status==='actual') actualManualIncome+=amount; else expectedManualIncome+=amount;}); const actualIncome=actualManualIncome; const expectedIncome=expectedManualIncome; const totalIncome=actualIncome+expectedIncome;`);
+const bridge=`<script>(function(){try{const actualIncome=()=>{let a=0;(window.STATE&&STATE.income||[]).forEach(i=>{if(i&&i.status==='actual')a+=Number(i.amount)||0});return a};function syncBalance(){const s=window.STATE;if(!s||!s.settings)return;const st=s.settings;if(st.__kopeykaBaseBalance===undefined)st.__kopeykaBaseBalance=Number(st.currentBalance)||0;st.currentBalance=(Number(st.__kopeykaBaseBalance)||0)+actualIncome()}const f=window.computePeriodSummary;if(typeof f==='function'&&!f.__kopeykaRootFix){window.computePeriodSummary=function(state,start,end){syncBalance();const s=f(state,start,end)||{};let a=0,e=0;(state&&state.income||[]).forEach(i=>{if(!i||i.date<start||i.date>end)return;const x=Number(i.amount)||0;if(i.status==='actual')a+=x;else e+=x});s.actualShiftIncome=0;s.expectedShiftIncome=0;s.actualManualIncome=a;s.expectedManualIncome=e;s.actualIncome=a;s.expectedIncome=e;s.totalIncome=a+e;s.currentBalance=(Number(state&&state.settings&&state.settings.__kopeykaBaseBalance)||0)+a;return s};window.computePeriodSummary.__kopeykaRootFix=true}syncBalance();const save=window.saveState;if(typeof save==='function'&&!save.__kopeykaRootFix){window.saveState=function(){syncBalance();return save.apply(this,arguments)};window.saveState.__kopeykaRootFix=true}const css=document.createElement('style');css.textContent='@media(max-width:899px){#main{padding:14px 12px calc(96px + env(safe-area-inset-bottom,0px))!important;min-height:100vh!important}.bottomnav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;z-index:100!important;width:100%!important;display:flex!important;flex-direction:row!important;justify-content:space-between!important;align-items:stretch!important;gap:2px!important;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))!important;min-height:68px!important;background:var(--surface)!important;border-top:1px solid var(--border)!important;overflow:hidden!important}.navbtn{box-sizing:border-box!important;flex:1 1 0!important;width:0!important;min-width:0!important;max-width:none!important;height:56px!important;padding:5px 2px!important;margin:0!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:3px!important;border-radius:12px!important;font-size:clamp(8.5px,2.65vw,10.5px)!important;line-height:1.05!important;white-space:nowrap!important;overflow:hidden!important}.navbtn svg{width:21px!important;height:21px!important;flex:0 0 21px!important}.navbtn span{display:block!important;min-width:0!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}.fab{bottom:calc(82px + env(safe-area-inset-bottom,0px))!important}.toast{bottom:calc(86px + env(safe-area-inset-bottom,0px))!important}.grid2{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}.card{padding:16px!important;margin-bottom:12px!important;overflow:hidden!important}.row{min-width:0!important}.item .body{min-width:0!important}.item .amt{font-size:13px!important;flex:none!important;white-space:nowrap!important}.big-number{font-size:clamp(30px,9vw,40px)!important}.mid-number{font-size:20px!important}}@media(max-width:360px){.navbtn{font-size:8px!important}.navbtn svg{width:19px!important;height:19px!important;flex-basis:19px!important}.card{padding:14px!important}.item{gap:9px!important}.item .ico{width:34px!important;height:34px!important}}';document.head.appendChild(css);setTimeout(()=>{try{syncBalance();if(typeof render==='function')render()}catch(e){}},0)}catch(e){console.warn('Kopeyka root fix:',e)}})();</script>`;html=html.replace('</body>',bridge+'</body>');return html}
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(['./','./index.html','./manifest.json','./icon.svg'])).catch(()=>{}));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));self.clients.claim()});
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new URL(e.request.url);if(u.origin===self.location.origin&&(u.pathname.endsWith('/')||u.pathname.endsWith('/index.html'))){e.respondWith((async()=>{try{const r=await fetch(e.request,{cache:'no-store'});return new Response(patch(await r.text()),{status:r.status,statusText:r.statusText,headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store'}})}catch(_){const c=await caches.match(e.request);if(!c)return Response.error();return new Response(patch(await c.text()),{headers:{'Content-Type':'text/html;charset=utf-8'}})}})());return}e.respondWith(fetch(e.request,{cache:'no-store'}).catch(()=>caches.match(e.request).then(r=>r||Response.error())))});
