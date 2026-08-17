@@ -1,4 +1,4 @@
-const CACHE_NAME='kopeyka-root-v10';
+const CACHE_NAME='kopeyka-root-v11';
 function patch(html){
   html=html.replace(/function shiftIncomeAmount\(shift\)\s*\{[\s\S]*?\n\}/m,'function shiftIncomeAmount(shift){ return 0; }');
   html=html.replace(/let actualShiftIncome=0, expectedShiftIncome=0;[\s\S]*?const actualIncome = actualShiftIncome\+actualManualIncome;\s*const expectedIncome = expectedShiftIncome\+expectedManualIncome;\s*const totalIncome = actualIncome\+expectedIncome;/m,`let actualShiftIncome=0, expectedShiftIncome=0;
@@ -12,6 +12,8 @@ function patch(html){
   const actualIncome=actualManualIncome;
   const expectedIncome=expectedManualIncome;
   const totalIncome=actualIncome+expectedIncome;`);
+  const bridge=`<script>(function(){try{const wrap=window.computePeriodSummary;if(typeof wrap==='function'&&!wrap.__cashBridge){const f=wrap;window.computePeriodSummary=function(state,start,end){const s=f(state,start,end)||{};let actual=0;(state&&state.income||[]).forEach(i=>{if(i&&i.date>=start&&i.date<=end&&i.status==='actual')actual+=Number(i.amount)||0});const base=Number(state&&state.settings&&state.settings.currentBalance)||0;s.currentBalance=base+actual;s.actualIncome=actual;s.actualManualIncome=actual;s.actualShiftIncome=0;return s};window.computePeriodSummary.__cashBridge=true;try{if(typeof render==='function')render()}catch(e){}}}catch(e){console.warn('cash bridge',e)}})();</script>`;
+  html=html.replace('</body>',bridge+'</body>');
   return html;
 }
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(['./','./index.html','./manifest.json','./icon.svg'])).catch(()=>{}));self.skipWaiting()});
