@@ -1,7 +1,6 @@
 /* KOPEYKA UI loader + undo manager */
 (function(){
   'use strict';
-  // Keep the original finance UI intact in a separate blob, then load it synchronously.
   try {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', 'ui-finance-v4-core.js', false);
@@ -15,14 +14,12 @@
     console.error('[Kopeyka] finance UI load failed', e);
   }
 
-  // Undo any saved application action. Every persist() call becomes one undo point.
-  // The snapshot is taken BEFORE the new state is written, so an accidental action
-  // (for example, marking a debt as paid) can be restored exactly.
   var KEY = 'kopeyka_undo_history_v1';
   var MAX = 20;
   var stack = [];
   var lastSnapshot = null;
   var restoring = false;
+  var undoTimer = null;
 
   function cloneState(){
     try { return JSON.parse(JSON.stringify(STATE)); } catch(e) { return null; }
@@ -48,6 +45,39 @@
     stack = stack.slice(-MAX);
     saveHistory();
   }
+  function showUndoToast(message){
+    var old = document.getElementById('kopeykaUndoToast');
+    if (old) old.remove();
+    if (undoTimer) clearTimeout(undoTimer);
+
+    var toast = document.createElement('div');
+    toast.id = 'kopeykaUndoToast';
+    toast.style.cssText = 'position:fixed;left:16px;right:16px;bottom:calc(82px + env(safe-area-inset-bottom,0px));z-index:95;display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);font:500 13px Inter,system-ui,sans-serif;';
+
+    var text = document.createElement('span');
+    text.textContent = message || 'Действие выполнено';
+    text.style.flex = '1';
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Отменить';
+    btn.style.cssText = 'border:0;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 11px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;';
+    btn.onclick = function(){
+      if (undoTimer) clearTimeout(undoTimer);
+      restorePrevious();
+      var current = document.getElementById('kopeykaUndoToast');
+      if (current) current.remove();
+    };
+
+    toast.appendChild(text);
+    toast.appendChild(btn);
+    document.body.appendChild(toast);
+    undoTimer = setTimeout(function(){
+      var current = document.getElementById('kopeykaUndoToast');
+      if (current) current.remove();
+    }, 7000);
+  }
+
   function restorePrevious(){
     if (!stack.length) {
       if (typeof showToast === 'function') showToast('Нечего отменять');
@@ -79,7 +109,6 @@
     };
   }
 
-  // Keyboard shortcut: Ctrl/Cmd+Z. Do not interfere with text fields.
   document.addEventListener('keydown', function(e){
     if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return;
     var tag = document.activeElement && document.activeElement.tagName;
@@ -88,18 +117,6 @@
     restorePrevious();
   });
 
-  // Compact floating undo button. It stays available on every screen.
-  function addUndoButton(){
-    if (document.getElementById('kopeykaUndoBtn')) return;
-    var b = document.createElement('button');
-    b.id = 'kopeykaUndoBtn';
-    b.type = 'button';
-    b.textContent = '↶ Отменить';
-    b.title = 'Отменить последнее действие';
-    b.style.cssText = 'position:fixed;right:18px;bottom:calc(148px + env(safe-area-inset-bottom,0px));z-index:90;border:1px solid var(--border);border-radius:999px;padding:9px 13px;background:var(--surface);color:var(--text);font:600 13px Inter,system-ui,sans-serif;box-shadow:var(--shadow);cursor:pointer;opacity:.92;';
-    b.onclick = restorePrevious;
-    document.body.appendChild(b);
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addUndoButton); else addUndoButton();
   window.kopeykaUndo = restorePrevious;
+  window.kopeykaShowUndo = showUndoToast;
 })();
