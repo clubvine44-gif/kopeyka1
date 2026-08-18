@@ -1,7 +1,5 @@
-/* Kopeyka Service Worker v42 — plain pass-through.
-   All app modules are linked directly in index.html via <script src>,
-   so this file must never rewrite HTML on the fly again. */
-const VERSION = 'kopeyka-v42';
+/* Kopeyka Service Worker v43 — bust caches after finance/cloud fixes */
+const VERSION = 'kopeyka-v43';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
