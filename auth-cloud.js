@@ -1,21 +1,151 @@
-/* KOPEYKA CLOUD v8 — account UI + cloud sync */
+/* KOPEYKA CLOUD v9 — account UI + cloud sync (hardened) */
 (function(){'use strict';
 const URL='https://cqslrfphsjllhltsvvuq.supabase.co',KEY='sb_publishable_cM_XCycYRFLIc6qEqlH83Q_5XY6kPzG';
-let sb=null,ready=false,saving=false,lastSent='',currentUser=null;
+let sb=null,ready=false,saving=false,lastSent='',currentUser=null,bootDone=false;
+
 function injectUiStyles(){if(document.getElementById('kc-ui-v8'))return;const s=document.createElement('style');s.id='kc-ui-v8';s.textContent=`#kc-account{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:12px;z-index:30001;font:12px Inter,system-ui,sans-serif}#kc-account-btn{width:42px;height:42px;padding:0!important;border-radius:50%!important;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}#kc-account-btn #kc-avatar{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:var(--text);background:var(--surface-2)}#kc-dot{position:absolute!important;right:1px;bottom:1px;width:10px!important;height:10px!important;border:2px solid var(--surface);z-index:2}#kc-account-menu{right:0!important;top:50px!important;width:min(280px,calc(100vw - 24px))!important;max-height:calc(100dvh - 72px);overflow:auto}@media(max-width:899px){.topbar{padding-right:66px!important;min-height:64px}#main{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))!important}.bottomnav{height:76px;min-height:76px;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))!important}.navbtn{min-width:0;padding:5px 7px!important;gap:3px!important}.navbtn svg{width:21px;height:21px}.fab{bottom:calc(88px + env(safe-area-inset-bottom,0px))!important;right:16px!important;width:54px;height:54px}#kc-auth{padding:calc(18px + env(safe-area-inset-top,0px)) 14px calc(18px + env(safe-area-inset-bottom,0px))!important}}@media(min-width:900px){#kc-account{top:14px;right:18px}.bottomnav{height:100vh}.fab{bottom:32px}}`;document.head.appendChild(s)}
+
 function loadSDK(){return new Promise((ok,bad)=>{if(window.supabase)return ok();const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';s.onload=ok;s.onerror=bad;document.head.appendChild(s)})}
 function client(){if(!sb&&window.supabase)sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});return sb}
-function status(text,good){let x=document.getElementById('kc-cloud');if(!x){x=document.createElement('div');x.id='kc-cloud';x.style.cssText='position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:30000;font:11px Inter,system-ui,sans-serif;background:var(--surface);padding:6px 10px;border-radius:9px;border:1px solid var(--border);box-shadow:var(--shadow);pointer-events:none;max-width:calc(100vw - 120px);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';document.body.appendChild(x)}x.style.color=good?'var(--safe)':'var(--danger)';x.textContent=text}
-function accountUI(){let x=document.getElementById('kc-account');if(x)return x;x=document.createElement('div');x.id='kc-account';x.innerHTML='<button id="kc-account-btn" class="icon-btn" aria-label="Профиль"><span id="kc-avatar">•••</span><span id="kc-dot"></span></button><div id="kc-account-menu" style="display:none;position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px;box-shadow:var(--shadow)"><div style="font-weight:700" id="kc-user-email"></div><div id="kc-sync-label" style="font-size:11px;color:var(--text-dim);margin-top:4px">Облако не синхронизировано</div><button id="kc-sync" class="btn btn-secondary btn-block" style="margin-top:10px">Синхронизировать сейчас</button><button id="kc-logout" class="btn btn-danger btn-block" style="margin-top:8px">Выйти из аккаунта</button></div>';document.body.appendChild(x);document.getElementById('kc-account-btn').onclick=()=>{const m=document.getElementById('kc-account-menu');m.style.display=m.style.display==='none'?'block':'none'};document.getElementById('kc-sync').onclick=async()=>{status('синхронизация…',true);await waitForState();await saveCloud(true)};document.getElementById('kc-logout').onclick=async()=>{await client().auth.signOut();currentUser=null;ready=false;lastSent='';setAccount(null);status('выполнен выход',false);auth()};return x}
-function setAccount(user){accountUI();const email=user?.email||'';const avatar=document.getElementById('kc-avatar');avatar.textContent=email?email.slice(0,1).toUpperCase():'?';document.getElementById('kc-user-email').textContent=email||'Нет активного аккаунта';document.getElementById('kc-dot').style.background=user?'var(--safe)':'var(--text-faint)'}
+
+function status(text,good){let x=document.getElementById('kc-cloud');if(!x){x=document.createElement('div');x.id='kc-cloud';x.style.cssText='position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:30000;font:11px Inter,system-ui,sans-serif;background:var(--surface);padding:6px 10px;border-radius:9px;border:1px solid var(--border);box-shadow:var(--shadow);pointer-events:none;max-width:calc(100vw - 120px);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';document.body.appendChild(x)}x.style.color=good?'var(--safe)':'var(--danger)';x.textContent=text;clearTimeout(status._t);status._t=setTimeout(()=>{if(x&&x.parentNode)x.remove()},good?2200:5000)}
+
+function accountUI(){let x=document.getElementById('kc-account');if(x)return x;x=document.createElement('div');x.id='kc-account';x.innerHTML='<button id="kc-account-btn" class="icon-btn" aria-label="Профиль"><span id="kc-avatar">•••</span><span id="kc-dot"></span></button><div id="kc-account-menu" style="display:none;position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px;box-shadow:var(--shadow)"><div style="font-weight:700" id="kc-user-email"></div><div id="kc-sync-label" style="font-size:11px;color:var(--text-dim);margin-top:4px">Облако не синхронизировано</div><button id="kc-sync" class="btn btn-secondary btn-block" style="margin-top:10px">Синхронизировать сейчас</button><button id="kc-logout" class="btn btn-danger btn-block" style="margin-top:8px">Выйти из аккаунта</button></div>';document.body.appendChild(x);document.getElementById('kc-account-btn').onclick=()=>{const m=document.getElementById('kc-account-menu');m.style.display=m.style.display==='none'?'block':'none'};document.getElementById('kc-sync').onclick=async()=>{status('синхронизация…',true);await waitForState();await saveCloud(true)};document.getElementById('kc-logout').onclick=async()=>{try{await client().auth.signOut()}catch(_){}currentUser=null;ready=false;lastSent='';setAccount(null);status('выполнен выход',false);auth()};return x}
+
+function setAccount(user){accountUI();const email=user?.email||'';const avatar=document.getElementById('kc-avatar');if(avatar)avatar.textContent=email?email.slice(0,1).toUpperCase():'?';const em=document.getElementById('kc-user-email');if(em)em.textContent=email||'Нет активного аккаунта';const dot=document.getElementById('kc-dot');if(dot)dot.style.background=user?'var(--safe)':'var(--text-faint)'}
 function setSyncLabel(t){const x=document.getElementById('kc-sync-label');if(x)x.textContent=t}
-function auth(){if(document.getElementById('kc-auth'))return;const x=document.createElement('div');x.id='kc-auth';x.style.cssText='position:fixed;inset:0;z-index:29999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:18px';x.innerHTML='<div style="width:min(430px,100%);background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:24px"><h2 style="margin-top:0">Копейка</h2><p>Войди в аккаунт, чтобы данные синхронизировались между браузерами и устройствами.</p><input id="kc-email" type="email" placeholder="Email" style="width:100%;margin:8px 0;padding:13px"><input id="kc-pass" type="password" placeholder="Пароль" style="width:100%;margin:8px 0;padding:13px"><div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-secondary" id="kc-signup">Создать аккаунт</button><button class="btn btn-primary" id="kc-login">Войти</button></div><div id="kc-msg" style="font-size:12px;margin-top:10px"></div></div>';document.body.appendChild(x);document.getElementById('kc-login').onclick=()=>doAuth(false);document.getElementById('kc-signup').onclick=()=>doAuth(true)}
-function authMsg(t){auth();document.getElementById('kc-msg').textContent=t}
+
+function auth(){if(document.getElementById('kc-auth'))return;const x=document.createElement('div');x.id='kc-auth';x.style.cssText='position:fixed;inset:0;z-index:29999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:18px';x.innerHTML='<div style="width:min(430px,100%);background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:24px"><h2 style="margin-top:0">Копейка</h2><p>Войди в аккаунт, чтобы данные синхронизировались между браузерами и устройствами.</p><input id="kc-email" type="email" placeholder="Email" style="width:100%;margin:8px 0;padding:13px"><input id="kc-pass" type="password" placeholder="Пароль" style="width:100%;margin:8px 0;padding:13px"><div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-secondary" id="kc-signup">Создать аккаунт</button><button class="btn btn-primary" id="kc-login">Войти</button></div><div id="kc-msg" style="font-size:12px;margin-top:10px"></div><button id="kc-skip" class="btn btn-ghost btn-block" style="margin-top:8px">Продолжить без аккаунта</button></div>';document.body.appendChild(x);document.getElementById('kc-login').onclick=()=>doAuth(false);document.getElementById('kc-signup').onclick=()=>doAuth(true);document.getElementById('kc-skip').onclick=()=>{closeAuth();status('работа локально',true)}}
+function authMsg(t){auth();const m=document.getElementById('kc-msg');if(m)m.textContent=t}
 async function doAuth(signup){const email=document.getElementById('kc-email').value.trim(),password=document.getElementById('kc-pass').value;if(!email||password.length<6)return authMsg('Введите email и пароль минимум из 6 символов.');authMsg(signup?'Создаю аккаунт…':'Выполняю вход…');try{const c=client(),r=signup?await c.auth.signUp({email,password}):await c.auth.signInWithPassword({email,password});if(r.error)throw r.error;if(signup&&!r.data.session)return authMsg('Подтверди email, затем войди.');await syncSession(r.data.session)}catch(e){authMsg(e.message||'Ошибка авторизации')}}
 function closeAuth(){const x=document.getElementById('kc-auth');if(x)x.remove()}
-function waitForState(timeout=5000){return new Promise(resolve=>{if(STATE)return resolve(true);const started=Date.now(),timer=setInterval(()=>{if(STATE||(Date.now()-started>=timeout)){clearInterval(timer);resolve(!!STATE)}},50)})}
-async function syncSession(session){if(!session?.user){currentUser=null;ready=false;setAccount(null);auth();return}currentUser=session.user;setAccount(currentUser);closeAuth();status('загрузка облака…',true);setSyncLabel('Загрузка данных…');const c=client();try{let q=await c.rpc('load_user_finance_state');if(q.error)throw q.error;const row=Array.isArray(q.data)?q.data[0]:q.data;if(row?.state){STATE=row.state;lastSent=JSON.stringify(STATE);localStorage.setItem('__state_v3__',lastSent);ready=true;if(typeof window.render==='function')window.render();status('облако синхронизировано',true);setSyncLabel('Синхронизировано')}else{await waitForState();if(!STATE)throw new Error('Состояние приложения ещё не инициализировано');ready=true;const ok=await saveCloud(true);if(!ok)throw new Error('Первая запись состояния не сохранилась')}}catch(e){ready=false;console.error('CLOUD LOAD/SAVE',e);status('ошибка облака: '+(e.message||'неизвестная ошибка'),false);setSyncLabel('Ошибка: '+(e.message||'неизвестная ошибка'))}}
-async function saveCloud(force){if(!currentUser){status('нет активного аккаунта',false);return false}if(!STATE){await waitForState();if(!STATE){status('состояние приложения ещё не готово',false);return false}}if(saving)return false;saving=true;setSyncLabel('Сохранение…');try{const json=JSON.stringify(STATE);if(!force&&json===lastSent){setSyncLabel('Синхронизировано');status('облако синхронизировано',true);return true}const c=client();let r=await c.rpc('save_user_finance_state',{p_state:STATE,p_version:8});if(r.error){console.warn('RPC save failed, trying table upsert',r.error);r=await c.from('user_finance_state').upsert({user_id:currentUser.id,state:STATE,version:8,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(r.error)throw new Error((r.error.message||r.error.code||'DB error'))}lastSent=json;localStorage.setItem('__state_v3__',json);status('облако синхронизировано',true);setSyncLabel('Синхронизировано');return true}catch(e){console.error('CLOUD SAVE',e);status('ошибка облака: '+(e.message||'неизвестная ошибка'),false);setSyncLabel('Ошибка: '+(e.message||'неизвестная ошибка'));return false}finally{saving=false}}
-async function boot(){try{injectUiStyles();await loadSDK();client();accountUI();const c=client();const session=await c.auth.getSession();if(session.error)throw session.error;if(session.data.session)await syncSession(session.data.session);else auth();c.auth.onAuthStateChange((_e,s)=>setTimeout(()=>syncSession(s),50));let lastObserved='';setInterval(()=>{if(!currentUser||!ready||!STATE)return;const j=JSON.stringify(STATE);if(j!==lastObserved){lastObserved=j;saveCloud(true)}},1200)}catch(e){console.error('CLOUD BOOT',e);authMsg('Ошибка подключения к облаку: '+(e.message||''))}}
-window.kopeykaCloud={save:()=>saveCloud(true),logout:async()=>{await client().auth.signOut();currentUser=null;ready=false;setAccount(null);auth()},user:()=>currentUser};boot();
+
+function waitForState(timeout=5000){return new Promise(resolve=>{if(typeof STATE!=='undefined'&&STATE)return resolve(true);const started=Date.now(),timer=setInterval(()=>{if((typeof STATE!=='undefined'&&STATE)||(Date.now()-started>=timeout)){clearInterval(timer);resolve(!!(typeof STATE!=='undefined'&&STATE))}},50)})}
+
+function normalizeState(raw){
+  try{
+    if(typeof window.ensureState==='function'){window.ensureState(raw);return STATE}
+    if(!raw||typeof raw!=='object')return raw;
+    if(!Array.isArray(raw.debts))raw.debts=[];
+    if(!Array.isArray(raw.income))raw.income=[];
+    if(!Array.isArray(raw.expenses))raw.expenses=[];
+    if(!Array.isArray(raw.recurring))raw.recurring=[];
+    if(!Array.isArray(raw.reserves))raw.reserves=[];
+    if(!Array.isArray(raw.reserveOps))raw.reserveOps=[];
+    if(!raw.settings||typeof raw.settings!=='object')raw.settings={};
+    if(typeof raw.settings.currentBalance!=='number')raw.settings.currentBalance=Number(raw.settings.currentBalance)||0;
+    return raw;
+  }catch(e){console.warn('normalizeState',e);return raw}
+}
+
+async function syncSession(session){
+  if(!session?.user){currentUser=null;ready=false;setAccount(null);if(bootDone)auth();return}
+  currentUser=session.user;setAccount(currentUser);closeAuth();
+  status('загрузка облака…',true);setSyncLabel('Загрузка данных…');
+  const c=client();
+  try{
+    let q=await c.rpc('load_user_finance_state');
+    if(q.error){
+      // fallback: try table read
+      const t=await c.from('user_finance_state').select('state').eq('user_id',currentUser.id).maybeSingle();
+      if(t.error)throw t.error;
+      q={data:t.data?[{state:t.data.state}]:[]};
+    }
+    const row=Array.isArray(q.data)?q.data[0]:q.data;
+    if(row?.state&&typeof row.state==='object'){
+      const normalized=normalizeState(row.state);
+      STATE=normalized;
+      lastSent=JSON.stringify(STATE);
+      try{localStorage.setItem('kopeyka_state_v1',lastSent)}catch(_){}
+      ready=true;
+      if(typeof window.render==='function'){try{window.render()}catch(re){console.error('render after cloud load',re)}}
+      status('облако синхронизировано',true);setSyncLabel('Синхронизировано');
+    }else{
+      await waitForState();
+      if(!STATE)throw new Error('Состояние приложения ещё не инициализировано');
+      normalizeState(STATE);
+      ready=true;
+      const ok=await saveCloud(true);
+      if(!ok){status('локальные данные сохранены, облако пока недоступно',false);setSyncLabel('Облако: ошибка записи')}
+    }
+  }catch(e){
+    ready=false;
+    console.error('CLOUD LOAD',e);
+    // НЕ ломаем UI — работаем локально
+    status('ошибка облака: '+(e.message||'неизвестная')+' — работаю локально',false);
+    setSyncLabel('Ошибка: '+(e.message||'неизвестная'));
+    if(typeof window.render==='function'){try{window.render()}catch(_){}}
+  }
+}
+
+async function saveCloud(force){
+  if(!currentUser){status('нет активного аккаунта',false);return false}
+  if(!STATE){await waitForState();if(!STATE){status('состояние ещё не готово',false);return false}}
+  if(saving)return false;
+  saving=true;setSyncLabel('Сохранение…');
+  try{
+    normalizeState(STATE);
+    // чистая копия для JSON (убираем циклы / undefined)
+    const clean=JSON.parse(JSON.stringify(STATE));
+    const json=JSON.stringify(clean);
+    if(!force&&json===lastSent){setSyncLabel('Синхронизировано');status('облако синхронизировано',true);return true}
+    const c=client();
+    let r=await c.rpc('save_user_finance_state',{p_state:clean,p_version:9});
+    if(r.error){
+      console.warn('RPC save failed, trying table upsert',r.error);
+      r=await c.from('user_finance_state').upsert({
+        user_id:currentUser.id,
+        state:clean,
+        version:9,
+        updated_at:new Date().toISOString()
+      },{onConflict:'user_id'});
+      if(r.error)throw new Error(r.error.message||r.error.code||'DB error');
+    }
+    lastSent=json;
+    try{localStorage.setItem('kopeyka_state_v1',json)}catch(_){}
+    status('облако синхронизировано',true);setSyncLabel('Синхронизировано');
+    return true;
+  }catch(e){
+    console.error('CLOUD SAVE',e);
+    // Локальные данные НЕ трогаем — только показываем ошибку
+    status('ошибка облака: '+(e.message||'неизвестная')+' — данные сохранены локально',false);
+    setSyncLabel('Ошибка: '+(e.message||'неизвестная'));
+    return false;
+  }finally{saving=false}
+}
+
+async function boot(){
+  try{
+    injectUiStyles();
+    await loadSDK();
+    client();
+    accountUI();
+    const c=client();
+    const session=await c.auth.getSession();
+    if(session.error)throw session.error;
+    bootDone=true;
+    if(session.data.session)await syncSession(session.data.session);
+    else auth();
+    c.auth.onAuthStateChange((_e,s)=>setTimeout(()=>syncSession(s),50));
+    let lastObserved='',saveDebounce=null;
+    setInterval(()=>{
+      if(!currentUser||!STATE)return;
+      try{
+        const j=JSON.stringify(STATE);
+        if(j!==lastObserved){
+          lastObserved=j;
+          clearTimeout(saveDebounce);
+          saveDebounce=setTimeout(()=>{if(ready)saveCloud(false)},800);
+        }
+      }catch(_){}
+    },1500);
+  }catch(e){
+    console.error('CLOUD BOOT',e);
+    bootDone=true;
+    authMsg('Ошибка подключения к облаку: '+(e.message||'')+'. Можно работать локально.');
+  }
+}
+
+window.kopeykaCloud={save:()=>saveCloud(true),logout:async()=>{try{await client().auth.signOut()}catch(_){}currentUser=null;ready=false;setAccount(null);auth()},user:()=>currentUser};
+boot();
 })();
