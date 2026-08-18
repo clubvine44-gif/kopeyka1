@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Копейка</title>
-<link rel="stylesheet" href="ui-shell.css?v=10">
-<link rel="stylesheet" href="kopeyka-pro.css?v=10">
+<link rel="stylesheet" href="ui-shell.css?v=11">
+<link rel="stylesheet" href="kopeyka-pro.css?v=11">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg?v=4" type="image/svg+xml">
 <script>
@@ -35,8 +35,8 @@
   if (html.indexOf('/* unified-hide-nav */') < 0) {
     html = html.replace('</head>',
       '<style>/* unified-hide-nav */.bottomnav,#nav{display:none!important;height:0!important;overflow:hidden!important}</style>\n' +
-      '<link rel="stylesheet" href="ui-shell.css?v=10">\n' +
-      '<link rel="stylesheet" href="kopeyka-pro.css?v=10">\n</head>');
+      '<link rel="stylesheet" href="ui-shell.css?v=11">\n' +
+      '<link rel="stylesheet" href="kopeyka-pro.css?v=11">\n</head>');
   }
 
   var stack = [
@@ -45,7 +45,7 @@
     '<script src="state-fix.js?v=1"><\/script>',
     '<script src="notes-undo.js?v=3"><\/script>',
     '<script src="calendar-stats.js?v=2"><\/script>',
-    '<script src="unified.js?v=1"><\/script>'
+    '<script src="unified.js?v=2"><\/script>'
   ].join('\n');
 
   if (html.indexOf('unified.js') < 0) {
