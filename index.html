@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Копейка — загрузка…</title>
 <link rel="stylesheet" href="ui-shell.css?v=3">
-<link rel="stylesheet" href="kopeyka-pro.css?v=2">
+<link rel="stylesheet" href="kopeyka-pro.css?v=3">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon.svg?v=4" type="image/svg+xml">
 <script>
 (async function(){
   const urls = [
@@ -23,29 +23,27 @@
     } catch(e) {}
   }
   if (!html) {
-    document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Не удалось загрузить приложение.</p>';
+    document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Не удалось загрузить.</p>';
     return;
   }
   var inject = [
     '<link rel="stylesheet" href="ui-shell.css?v=3">',
-    '<link rel="stylesheet" href="kopeyka-pro.css?v=2">',
+    '<link rel="stylesheet" href="kopeyka-pro.css?v=3">',
     '<link rel="manifest" href="manifest.json">',
-    '<link rel="icon" href="icon.svg" type="image/svg+xml">',
+    '<link rel="icon" href="icon.svg?v=4" type="image/svg+xml">',
+    '<link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">',
     '<script src="calendar-stats.js?v=1"><\/script>',
     '<script src="ui-shell.js?v=3"><\/script>',
-    '<script src="kopeyka-pro.js?v=2"><\/script>'
+    '<script src="kopeyka-pro.js?v=4"><\/script>'
   ].join('\n');
   if (html.indexOf('kopeyka-pro.js') < 0) {
     html = html.replace('</body>', inject + '\n</body>');
   } else {
-    html = html.replace(/kopeyka-pro\.js\?v=\d+/g, 'kopeyka-pro.js?v=2');
-    html = html.replace(/kopeyka-pro\.css\?v=\d+/g, 'kopeyka-pro.css?v=2');
+    html = html.replace(/kopeyka-pro\.js\?v=\d+/g, 'kopeyka-pro.js?v=4');
+    html = html.replace(/kopeyka-pro\.css\?v=\d+/g, 'kopeyka-pro.css?v=3');
   }
   if (html.indexOf('calendar-stats.js') < 0 && html.indexOf('income-guard.js') >= 0) {
-    html = html.replace(
-      '<script src="income-guard.js',
-      '<script src="calendar-stats.js?v=1"><\/script>\n<script src="income-guard.js'
-    );
+    html = html.replace('<script src="income-guard.js', '<script src="calendar-stats.js?v=1"><\/script>\n<script src="income-guard.js');
   }
   html = html.replace(/auth-cloud\.js\?v=\d+/g, 'auth-cloud.js?v=11');
   html = html.replace(/ui-finance-v4\.js\?v=\d+/g, 'ui-finance-v4.js?v=5');
