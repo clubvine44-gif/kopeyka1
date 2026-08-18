@@ -1,8 +1,8 @@
 /* KOPEYKA — finance compatibility + Notes + Undo */
 (function(){
 'use strict';
-/* Compatibility layer: ui-finance-v4.js replaces computePeriodSummary with a smaller object.
-   Legacy screens still expect reserveBreakdown/allocation and manual-income fields. */
+/* Compatibility layer: keeps reserveBreakdown/allocation for legacy screens.
+   Target-date reserves count only in the month of the target (or if overdue). */
 (function(){
   var N=function(v){return Number(v)||0};
   var T=function(){return typeof todayStr==='function'?todayStr():new Date().toISOString().slice(0,10)};
@@ -15,12 +15,10 @@
     else if(r.method==='percent') need=totalIncome*N(r.percent)/100;
     else if(r.method==='target'&&r.targetDate){
       var left=Math.max(0,target-saved);
-      if(left>0&&String(r.targetDate)>=today){
-        var end=String(e)<String(r.targetDate)?e:r.targetDate;
-        if(String(end)>=today){
-          var total=Math.max(1,DD(today,r.targetDate)+1), part=Math.max(1,DD(today,end)+1);
-          need=left*part/total;
-        }
+      if(left>0){
+        var td=String(r.targetDate);
+        // цель в этом периоде → весь остаток; просроченная → тоже; следующий месяц → 0
+        if((td>=String(s)&&td<=String(e)) || td<String(s)) need=left;
       }
     }
     var ops=arr(state.reserveOps); if(!ops.length)ops=arr(state.reserve_ops);
@@ -35,7 +33,8 @@
     expenses.forEach(function(x){if(!IR(x.date,s,e))return;var v=N(x.amount);if(x.mandatory){if(String(x.date)<=today)actualObligatory+=v;else plannedObligatory+=v}else{if(String(x.date)<=today)actualRegular+=v;else plannedRegular+=v}});
     if(typeof occurrencesInRange==='function') recurring.filter(function(r){return r.active}).forEach(function(r){try{occurrencesInRange(r,s,e).forEach(function(d){var v=N(r.amount);if(String(d)<=today)actualObligatory+=v;else plannedObligatory+=v})}catch(_) {}});
     var actualIncome=actualManualIncome, expectedIncome=expectedManualIncome;
-    var paidDebts=0,unpaidDebts=0; debts.forEach(function(d){var amount=N(d.amount),paid=N(d.paid),left=Math.max(0,amount-paid),due=d.dueDate||e;if(left>0&&IR(due,s,e))unpaidDebts+=left;if(paid>0)paidDebts+=Math.min(paid,amount)});
+    // Все непогашенные долги, не только с сроком в этом месяце
+    var paidDebts=0,unpaidDebts=0; debts.forEach(function(d){var amount=N(d.amount),paid=N(d.paid),left=Math.max(0,amount-paid);if(left>0)unpaidDebts+=left;if(paid>0)paidDebts+=Math.min(paid,amount)});
     var ops=arr(state.reserveOps);if(!ops.length)ops=arr(state.reserve_ops);
     var reserveDeposits=ops.filter(function(o){return o&&o.type==='deposit'&&IR(o.date,s,e)&&String(o.date)<=today;}).reduce(function(a,o){return a+N(o.amount)},0);
     var reserveWithdrawals=ops.filter(function(o){return o&&o.type==='withdraw'&&IR(o.date,s,e)&&String(o.date)<=today;}).reduce(function(a,o){return a+N(o.amount)},0);
@@ -45,7 +44,7 @@
     var forecastAfterReserves=Math.max(0,noReservePool-reservesNeeded),strictAvailable=Math.max(0,cash-plannedRegular-plannedObligatory-unpaidDebts-reservesNeeded);
     var start=String(today)>String(s)?today:s,days=String(e)<String(today)?0:Math.max(0,DD(start,e)+1),allocation=[],leftPool=forecastBeforeReserves;
     reserveBreakdown.slice().sort(function(a,b){return (a.reserve.priority||99)-(b.reserve.priority||99)}).forEach(function(x){var allocated=Math.min(x.need,Math.max(0,leftPool));leftPool-=allocated;allocation.push({reserve:x.reserve,need:x.need,allocated:allocated,deficit:Math.max(0,x.need-allocated)})});
-    return {periodStart:s,periodEnd:e,remainingDays:days,shiftsList:[],actualShiftIncome:0,expectedShiftIncome:0,actualManualIncome:actualManualIncome,expectedManualIncome:expectedManualIncome,actualIncome:actualIncome,expectedIncome:expectedIncome,totalIncome:actualIncome+expectedIncome,actualRegular:actualRegular,plannedRegular:plannedRegular,totalRegular:actualRegular+plannedRegular,actualObligatory:actualObligatory,plannedObligatory:plannedObligatory,totalObligatory:actualObligatory+plannedObligatory,reservesNeeded:reservesNeeded,reserveBreakdown:reserveBreakdown,allocation:allocation,currentBalance:cash,availableNow:cash,forecastBeforeReserves:forecastBeforeReserves,forecastAfterReserves:forecastAfterReserves,strictAvailable:strictAvailable,noReserveLimit:days?Math.floor(noReservePool/days):null,safeLimit:days?Math.floor(forecastAfterReserves/days):null,strictLimit:days?Math.floor(strictAvailable/days):null,debtsDue:unpaidDebts,debtsPaid:paidDebts,reserveDeposits:reserveDeposits,reserveWithdrawals:reserveWithdrawals};
+    return {periodStart:s,periodEnd:e,remainingDays:days,shiftsList:[],actualShiftIncome:0,expectedShiftIncome:0,actualManualIncome:actualManualIncome,expectedManualIncome:expectedManualIncome,actualIncome:actualIncome,expectedIncome:expectedIncome,totalIncome:actualIncome+expectedIncome,actualRegular:actualRegular,plannedRegular:plannedRegular,totalRegular:actualRegular+plannedRegular,actualObligatory:actualObligatory,plannedObligatory:plannedObligatory,totalObligatory:actualObligatory+plannedObligatory,reservesNeeded:reservesNeeded,reserveBreakdown:reserveBreakdown,allocation:allocation,currentBalance:cash,availableNow:strictAvailable,forecastBeforeReserves:forecastBeforeReserves,forecastAfterReserves:forecastAfterReserves,strictAvailable:strictAvailable,noReserveLimit:days?Math.floor(noReservePool/days):null,safeLimit:days?Math.floor(forecastAfterReserves/days):null,strictLimit:days?Math.floor(strictAvailable/days):null,debtsDue:unpaidDebts,debtsPaid:paidDebts,reserveDeposits:reserveDeposits,reserveWithdrawals:reserveWithdrawals};
   };
   window.financeCore=window.computePeriodSummary;
 })();
