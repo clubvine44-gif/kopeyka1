@@ -1,10 +1,13 @@
-/* ui-shell.js v2 — round FAB + semicircle nav */
+/* ui-shell.js v3 — arc without home, swipe-back */
 (function(){
 'use strict';
 
 var OPEN = false;
+var historyStack = [];
+var lastRoute = null;
+var swipe = {x0:0,y0:0,t0:0,active:false};
+
 var items = [
-  {id:'home', label:'Главная', icon:'home'},
   {id:'calendar', label:'Календарь', icon:'calendar'},
   {id:'income', label:'Доходы', icon:'income'},
   {id:'expenses', label:'Расходы', icon:'expenses'},
@@ -35,6 +38,38 @@ function iconSvg(name){
   return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/></svg>';
 }
 
+function goRoute(id){
+  if(typeof ROUTE === 'undefined') return;
+  if(ROUTE === id) return;
+  historyStack.push(ROUTE);
+  if(historyStack.length > 30) historyStack.shift();
+  ROUTE = id;
+  window.scrollTo(0,0);
+  if(typeof render === 'function') render();
+}
+
+function goBack(){
+  if(OPEN){ closeNav(); return true; }
+  var modal = document.querySelector('#modalRoot .modal');
+  if(modal && typeof closeModal === 'function'){
+    try{ closeModal(); return true; }catch(_){}
+  }
+  if(historyStack.length){
+    var prev = historyStack.pop();
+    if(typeof ROUTE !== 'undefined') ROUTE = prev;
+    window.scrollTo(0,0);
+    if(typeof render === 'function') render();
+    return true;
+  }
+  if(typeof ROUTE !== 'undefined' && ROUTE !== 'home'){
+    ROUTE = 'home';
+    window.scrollTo(0,0);
+    if(typeof render === 'function') render();
+    return true;
+  }
+  return false;
+}
+
 function layoutArc(){
   var arc = document.getElementById('shellNavArc');
   if(!arc) return;
@@ -44,17 +79,16 @@ function layoutArc(){
   items.forEach(function(it, idx){
     var active = it.id === route ? ' active' : '';
     var add = it.id === '__add__' ? ' add-card' : '';
-    html += '<button type="button" class="shell-arc-btn'+active+add+'" data-shell-route="'+it.id+'" data-idx="'+idx+'" style="transition-delay:'+(idx*28)+'ms">';
+    html += '<button type="button" class="shell-arc-btn'+active+add+'" data-shell-route="'+it.id+'" style="transition-delay:'+(idx*26)+'ms">';
     html += iconSvg(it.icon);
-    html += '<span class="lbl">'+it.label+'</span>';
-    html += '</button>';
+    html += '<span class="lbl">'+it.label+'</span></button>';
   });
   arc.innerHTML = html;
 
   var vw = Math.min(window.innerWidth, 420);
-  var radius = Math.max(118, Math.min(148, vw * 0.38));
-  var start = Math.PI;
-  var end = 0;
+  var radius = Math.max(122, Math.min(158, vw * 0.40));
+  var start = Math.PI * 0.92;
+  var end = Math.PI * 0.08;
   arc.querySelectorAll('.shell-arc-btn').forEach(function(btn, i){
     var t = n === 1 ? 0.5 : i / (n - 1);
     var angle = start + (end - start) * t;
@@ -62,11 +96,9 @@ function layoutArc(){
     var y = -Math.sin(angle) * radius;
     btn.dataset.tx = x;
     btn.dataset.ty = y;
-    if(OPEN){
-      btn.style.transform = 'translate('+x+'px,'+y+'px) scale(1)';
-    } else {
-      btn.style.transform = 'translate(0px,0px) scale(.35)';
-    }
+    btn.style.transform = OPEN
+      ? 'translate('+x+'px,'+y+'px) scale(1)'
+      : 'translate(0px,0px) scale(.35)';
   });
 
   arc.querySelectorAll('[data-shell-route]').forEach(function(btn){
@@ -78,9 +110,7 @@ function layoutArc(){
         if(typeof openFabMenu === 'function') openFabMenu();
         return;
       }
-      if(typeof ROUTE !== 'undefined') ROUTE = id;
-      window.scrollTo(0,0);
-      if(typeof render === 'function') render();
+      goRoute(id);
     });
   });
 }
@@ -95,9 +125,7 @@ function openNav(){
   requestAnimationFrame(function(){
     requestAnimationFrame(function(){
       arc.querySelectorAll('.shell-arc-btn').forEach(function(btn){
-        var x = btn.dataset.tx || 0;
-        var y = btn.dataset.ty || 0;
-        btn.style.transform = 'translate('+x+'px,'+y+'px) scale(1)';
+        btn.style.transform = 'translate('+(btn.dataset.tx||0)+'px,'+(btn.dataset.ty||0)+'px) scale(1)';
       });
     });
   });
@@ -145,7 +173,12 @@ function compactTopbar(){
   if(!top) return;
   var mobileBrand = top.querySelector('.sidebar-brand-mobile');
   if(mobileBrand && !mobileBrand.querySelector('.shell-top-brand')){
-    mobileBrand.innerHTML = '<div class="shell-top-brand"><span class="coin-dot"></span> Копейка</div>';
+    mobileBrand.innerHTML = '<div class="shell-top-brand" id="shellBrandHome"><span class="coin-dot"></span> Копейка</div>';
+  }
+  var brand = document.getElementById('shellBrandHome');
+  if(brand && !brand.__wired){
+    brand.__wired = true;
+    brand.addEventListener('click', function(){ goRoute('home'); });
   }
 }
 
@@ -154,20 +187,69 @@ function patchRenderNav(){
   var orig = window.renderNav;
   window.renderNav = function(){
     try{ orig.apply(this, arguments); }catch(_){}
+    lastRoute = typeof ROUTE !== 'undefined' ? ROUTE : lastRoute;
     compactTopbar();
     wireFab();
   };
   window.renderNav.__shell = true;
 }
 
+function patchNavClicks(){
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest && e.target.closest('[data-route]');
+    if(!btn) return;
+    var id = btn.getAttribute('data-route');
+    if(!id || typeof ROUTE === 'undefined') return;
+    if(id !== ROUTE){
+      historyStack.push(ROUTE);
+      if(historyStack.length > 30) historyStack.shift();
+    }
+  }, true);
+}
+
+function wireSwipeBack(){
+  if(window.__shellSwipe) return;
+  window.__shellSwipe = true;
+  document.addEventListener('touchstart', function(e){
+    if(!isMobile() || e.touches.length !== 1) return;
+    var t = e.touches[0];
+    swipe.x0 = t.clientX;
+    swipe.y0 = t.clientY;
+    swipe.t0 = Date.now();
+    swipe.active = true;
+  }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    if(!swipe.active || !e.changedTouches || !e.changedTouches.length) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - swipe.x0;
+    var dy = t.clientY - swipe.y0;
+    var dt = Date.now() - swipe.t0;
+    swipe.active = false;
+    if(dx > 72 && Math.abs(dy) < 56 && dt < 450){
+      if(swipe.x0 < 40 || dx > 120){
+        goBack();
+      }
+    }
+  }, {passive:true});
+  try{
+    history.pushState({shell:1}, '');
+    window.addEventListener('popstate', function(){
+      if(goBack()){
+        history.pushState({shell:1}, '');
+      }
+    });
+  }catch(_){}
+}
+
 function boot(){
   ensureDom();
   patchRenderNav();
+  patchNavClicks();
   wireFab();
   compactTopbar();
-  window.addEventListener('resize', function(){
-    if(OPEN) layoutArc();
-  });
+  wireSwipeBack();
+  if(typeof ROUTE !== 'undefined') lastRoute = ROUTE;
+  window.addEventListener('resize', function(){ if(OPEN) layoutArc(); });
   setTimeout(function(){ patchRenderNav(); wireFab(); compactTopbar(); }, 50);
   setTimeout(function(){ patchRenderNav(); wireFab(); }, 400);
 }
