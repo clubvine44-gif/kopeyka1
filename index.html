@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Копейка — загрузка…</title>
-<link rel="stylesheet" href="ui-shell.css?v=1">
+<link rel="stylesheet" href="ui-shell.css?v=2">
 <script>
 (async function(){
   const urls = [
@@ -24,9 +24,9 @@
     return;
   }
   var inject = [
-    '<link rel="stylesheet" href="ui-shell.css?v=1">',
+    '<link rel="stylesheet" href="ui-shell.css?v=2">',
     '<script src="calendar-stats.js?v=1"><\/script>',
-    '<script src="ui-shell.js?v=1"><\/script>'
+    '<script src="ui-shell.js?v=2"><\/script>'
   ].join('\n');
   if (html.indexOf('ui-shell.js') < 0) {
     html = html.replace('</body>', inject + '\n</body>');
