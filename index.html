@@ -596,7 +596,8 @@ const ICONS={
   settings:'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 13.5a1.65 1.65 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.65 1.65 0 0 0-1.9-.3 1.65 1.65 0 0 0-1 1.5V20a2 2 0 1 1-4 0v-.2a1.65 1.65 0 0 0-1-1.5 1.65 1.65 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.65 1.65 0 0 0 .3-1.9 1.65 1.65 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.2a1.65 1.65 0 0 0 1.5-1 1.65 1.65 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.65 1.65 0 0 0 1.9.3H10a1.65 1.65 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.2a1.65 1.65 0 0 0 1 1.5 1.65 1.65 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.65 1.65 0 0 0-.3 1.9V10a1.65 1.65 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.2a1.65 1.65 0 0 0-1.5 1Z" stroke="currentColor" stroke-width="1.6"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none"><path d="M4 20V10M11 20V4M18 20v-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   close:'<svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
-  trash:'<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 12.5a1 1 0 0 0 1 .9h6a1 1 0 0 0 1-.9L17 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  trash:'<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 12.5a1 1 0 0 0 1 .9h6a1 1 0 0 0 1-.9L17 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  notes:'<svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h9.5L19 7v13.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
 };
 
 /* ---------------------------- NAV ---------------------------------------- */
@@ -606,6 +607,7 @@ const NAV_ITEMS=[
   {id:'income',label:'Доходы',icon:'income'},
   {id:'expenses',label:'Расходы',icon:'expenses'},
   {id:'reserves',label:'Резервы',icon:'reserves'},
+  {id:'notes',label:'Заметки',icon:'notes'},
   {id:'settings',label:'Настройки',icon:'settings'}
 ];
 function renderNav(){
@@ -1336,6 +1338,7 @@ function openFabMenu(){
     ['Обязательный платёж','recurring'], ['Резерв','reserve']
   ];
   opts.forEach(o=>{ h+='<button class="btn btn-secondary btn-block" style="margin-bottom:9px;" data-add="'+o[1]+'">'+o[0]+'</button>'; });
+  h+='<button class="btn btn-secondary btn-block" style="margin-top:9px;border-top:1px solid var(--border);padding-top:18px;" data-add="undo">↶ Отменить последнее действие</button>';
   h+='</div>';
   showModal(h);
   document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',()=>{
@@ -1345,6 +1348,7 @@ function openFabMenu(){
     else if(t==='expense') openExpenseModal(null);
     else if(t==='recurring') openRecurringModal(null);
     else if(t==='reserve') openReserveModal(null);
+    else if(t==='undo') window.kopeykaOpenUndo && window.kopeykaOpenUndo();
   }));
 }
 
@@ -1358,6 +1362,7 @@ function render(){
   else if(ROUTE==='reserves') renderReserves();
   else if(ROUTE==='settings') renderSettings();
   else if(ROUTE==='analytics') renderAnalytics();
+  else if(ROUTE==='notes') renderNotes();
 }
 
 /* ---------------------------- INIT ---------------------------------------- */
@@ -1376,6 +1381,7 @@ if('serviceWorker' in navigator){
 <!-- Доп. модули подключены напрямую (никаких трюков через service worker) -->
 <script src="income-guard.js?v=1"></script>
 <script src="auth-cloud.js?v=9"></script>
-<script src="ui-finance-v4.js?v=3"></script>
+<script src="ui-finance-v4.js?v=4"></script>
+<script src="notes-undo.js?v=1"></script>
 </body>
 </html>
