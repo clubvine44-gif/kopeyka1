@@ -1,1 +1,41 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Копейка — загрузка…</title>
+<script>
+(async function(){
+  const urls = [
+    'https://cdn.jsdelivr.net/gh/clubvine44-gif/kopeyka1@a6ea561eac70f7bc73d9fa0235487664127d1e2f/index.html',
+    'https://raw.githack.com/clubvine44-gif/kopeyka1/a6ea561eac70f7bc73d9fa0235487664127d1e2f/index.html',
+    'https://raw.githubusercontent.com/clubvine44-gif/kopeyka1/a6ea561eac70f7bc73d9fa0235487664127d1e2f/index.html'
+  ];
+  let html = null;
+  for (const u of urls) {
+    try {
+      const r = await fetch(u, {cache:'no-store'});
+      if (r.ok) { html = await r.text(); if (html && html.indexOf('Копейка')>=0) break; }
+    } catch(e) {}
+  }
+  if (!html) {
+    document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Не удалось загрузить приложение. Обнови страницу.</p>';
+    return;
+  }
+  if (html.indexOf('calendar-stats.js') < 0) {
+    html = html.replace(
+      '<script src="income-guard.js',
+      '<script src="calendar-stats.js?v=1"><\/script>\n<script src="income-guard.js'
+    );
+  }
+  html = html.replace(/auth-cloud\.js\?v=\d+/g, 'auth-cloud.js?v=11');
+  html = html.replace(/ui-finance-v4\.js\?v=\d+/g, 'ui-finance-v4.js?v=5');
+  html = html.replace(/notes-undo\.js\?v=\d+/g, 'notes-undo.js?v=2');
+  document.open();
+  document.write(html);
+  document.close();
+})();
+</script>
+</head>
+<body style="font-family:system-ui;background:#14151B;color:#F2F1EC;padding:24px">Загрузка Копейки…</body>
+</html>
