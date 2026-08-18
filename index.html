@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<title>Копейка — загрузка…</title>
-<link rel="stylesheet" href="ui-shell.css?v=3">
-<link rel="stylesheet" href="kopeyka-pro.css?v=8">
+<title>Копейка</title>
+<link rel="stylesheet" href="ui-shell.css?v=10">
+<link rel="stylesheet" href="kopeyka-pro.css?v=10">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg?v=4" type="image/svg+xml">
 <script>
@@ -26,27 +26,32 @@
     document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Не удалось загрузить.</p>';
     return;
   }
-  var inject = [
-    '<link rel="stylesheet" href="ui-shell.css?v=3">',
-    '<link rel="stylesheet" href="kopeyka-pro.css?v=8">',
-    '<link rel="manifest" href="manifest.json">',
-    '<link rel="icon" href="icon.svg?v=4" type="image/svg+xml">',
-    '<script src="calendar-stats.js?v=1"><\/script>',
-    '<script src="ui-shell.js?v=3"><\/script>',
-    '<script src="kopeyka-pro.js?v=8"><\/script>'
+
+  html = html.replace(/<script[^>]*ui-finance-v4\.js[^>]*><\/script>/gi, '');
+  html = html.replace(/<script[^>]*notes-undo\.js[^>]*><\/script>/gi, '');
+  html = html.replace(/<script[^>]*income-guard\.js[^>]*><\/script>/gi, '');
+  html = html.replace(/<script[^>]*auth-cloud\.js[^>]*><\/script>/gi, '');
+
+  if (html.indexOf('/* unified-hide-nav */') < 0) {
+    html = html.replace('</head>',
+      '<style>/* unified-hide-nav */.bottomnav,#nav{display:none!important;height:0!important;overflow:hidden!important}</style>\n' +
+      '<link rel="stylesheet" href="ui-shell.css?v=10">\n' +
+      '<link rel="stylesheet" href="kopeyka-pro.css?v=10">\n</head>');
+  }
+
+  var stack = [
+    '<script src="income-guard.js?v=1"><\/script>',
+    '<script src="auth-cloud.js?v=12"><\/script>',
+    '<script src="state-fix.js?v=1"><\/script>',
+    '<script src="notes-undo.js?v=3"><\/script>',
+    '<script src="calendar-stats.js?v=2"><\/script>',
+    '<script src="unified.js?v=1"><\/script>'
   ].join('\n');
-  if (html.indexOf('kopeyka-pro.js') < 0) {
-    html = html.replace('</body>', inject + '\n</body>');
-  } else {
-    html = html.replace(/kopeyka-pro\.js\?v=\d+/g, 'kopeyka-pro.js?v=8');
-    html = html.replace(/kopeyka-pro\.css\?v=\d+/g, 'kopeyka-pro.css?v=8');
+
+  if (html.indexOf('unified.js') < 0) {
+    html = html.replace('</body>', stack + '\n</body>');
   }
-  if (html.indexOf('calendar-stats.js') < 0 && html.indexOf('income-guard.js') >= 0) {
-    html = html.replace('<script src="income-guard.js', '<script src="calendar-stats.js?v=1"><\/script>\n<script src="income-guard.js');
-  }
-  html = html.replace(/auth-cloud\.js\?v=\d+/g, 'auth-cloud.js?v=11');
-  html = html.replace(/ui-finance-v4\.js\?v=\d+/g, 'ui-finance-v4.js?v=5');
-  html = html.replace(/notes-undo\.js\?v=\d+/g, 'notes-undo.js?v=2');
+
   document.open();
   document.write(html);
   document.close();
