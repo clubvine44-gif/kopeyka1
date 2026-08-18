@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Копейка — загрузка…</title>
 <link rel="stylesheet" href="ui-shell.css?v=3">
+<link rel="stylesheet" href="kopeyka-pro.css?v=1">
 <script>
 (async function(){
   const urls = [
@@ -20,15 +21,17 @@
     } catch(e) {}
   }
   if (!html) {
-    document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Не удалось загрузить приложение. Обнови страницу.</p>';
+    document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Не удалось загрузить приложение.</p>';
     return;
   }
   var inject = [
     '<link rel="stylesheet" href="ui-shell.css?v=3">',
+    '<link rel="stylesheet" href="kopeyka-pro.css?v=1">',
     '<script src="calendar-stats.js?v=1"><\/script>',
-    '<script src="ui-shell.js?v=3"><\/script>'
+    '<script src="ui-shell.js?v=3"><\/script>',
+    '<script src="kopeyka-pro.js?v=1"><\/script>'
   ].join('\n');
-  if (html.indexOf('ui-shell.js') < 0) {
+  if (html.indexOf('kopeyka-pro.js') < 0) {
     html = html.replace('</body>', inject + '\n</body>');
   }
   if (html.indexOf('calendar-stats.js') < 0 && html.indexOf('income-guard.js') >= 0) {
