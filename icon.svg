@@ -1,9 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#14151B"/>
-  <circle cx="256" cy="256" r="168" fill="none" stroke="#242631" stroke-width="40"/>
-  <path d="M256 88a168 168 0 0 1 145.5 84" fill="none" stroke="#E8A33D" stroke-width="40" stroke-linecap="round"/>
-  <path d="M401.5 172a168 168 0 0 1 0 168" fill="none" stroke="#7C8AF5" stroke-width="40" stroke-linecap="round"/>
-  <path d="M401.5 340a168 168 0 0 1 -145.5 84" fill="none" stroke="#7FC9A0" stroke-width="40" stroke-linecap="round"/>
-  <circle cx="256" cy="256" r="70" fill="#4FD1A5"/>
-  <text x="256" y="276" font-family="Georgia,serif" font-size="72" font-weight="700" fill="#08201A" text-anchor="middle">₽</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C86FA"/>
+      <stop offset="100%" stop-color="#4143A8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="50" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M191 146 L191 366"/>
+    <path d="M191 262 L339 146"/>
+    <path d="M191 262 L339 366"/>
+  </g>
+  <circle cx="366" cy="366" r="26" fill="#4FD1A5"/>
 </svg>
