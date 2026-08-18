@@ -4,59 +4,53 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Копейка</title>
-<link rel="stylesheet" href="ui-shell.css?v=11">
-<link rel="stylesheet" href="kopeyka-pro.css?v=11">
+<link rel="stylesheet" href="app.css?v=1">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg?v=4" type="image/svg+xml">
 <script>
-(async function(){
-  const urls = [
+(async function () {
+  var urls = [
     'https://cdn.jsdelivr.net/gh/clubvine44-gif/kopeyka1@a6ea561eac70f7bc73d9fa0235487664127d1e2f/index.html',
     'https://raw.githack.com/clubvine44-gif/kopeyka1/a6ea561eac70f7bc73d9fa0235487664127d1e2f/index.html',
     'https://raw.githubusercontent.com/clubvine44-gif/kopeyka1/a6ea561eac70f7bc73d9fa0235487664127d1e2f/index.html'
   ];
-  let html = null;
-  for (const u of urls) {
+  var html = null;
+  for (var i = 0; i < urls.length; i++) {
     try {
-      const r = await fetch(u, {cache:'no-store'});
-      if (r.ok) { html = await r.text(); if (html && html.indexOf('Копейка')>=0) break; }
-    } catch(e) {}
+      var r = await fetch(urls[i], { cache: 'no-store' });
+      if (r.ok) {
+        html = await r.text();
+        if (html && html.indexOf('Копейка') >= 0) break;
+      }
+    } catch (e) {}
   }
   if (!html) {
-    document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Не удалось загрузить.</p>';
+    document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px">Не удалось загрузить приложение.</p>';
     return;
   }
-
-  html = html.replace(/<script[^>]*ui-finance-v4\.js[^>]*><\/script>/gi, '');
-  html = html.replace(/<script[^>]*notes-undo\.js[^>]*><\/script>/gi, '');
-  html = html.replace(/<script[^>]*income-guard\.js[^>]*><\/script>/gi, '');
-  html = html.replace(/<script[^>]*auth-cloud\.js[^>]*><\/script>/gi, '');
-
-  if (html.indexOf('/* unified-hide-nav */') < 0) {
-    html = html.replace('</head>',
-      '<style>/* unified-hide-nav */.bottomnav,#nav{display:none!important;height:0!important;overflow:hidden!important}</style>\n' +
-      '<link rel="stylesheet" href="ui-shell.css?v=11">\n' +
-      '<link rel="stylesheet" href="kopeyka-pro.css?v=11">\n</head>');
-  }
-
+  // Remove ALL competing scripts from historical core
+  html = html.replace(/<script[^>]*(ui-finance-v4|notes-undo|income-guard|auth-cloud|kopeyka-pro|ui-shell|unified|calendar-stats)\.js[^>]*><\/script>/gi, '');
+  // Styles + hide bottom nav
+  html = html.replace('</head>',
+    '<link rel="stylesheet" href="app.css?v=1">' +
+    '<style>.bottomnav,#nav{display:none!important;height:0!important;overflow:hidden!important;pointer-events:none!important}</style>' +
+    '</head>'
+  );
+  // Single clean stack
   var stack = [
     '<script src="income-guard.js?v=1"><\/script>',
     '<script src="auth-cloud.js?v=12"><\/script>',
     '<script src="state-fix.js?v=1"><\/script>',
     '<script src="notes-undo.js?v=3"><\/script>',
     '<script src="calendar-stats.js?v=2"><\/script>',
-    '<script src="unified.js?v=2"><\/script>'
+    '<script src="app.js?v=1"><\/script>'
   ].join('\n');
-
-  if (html.indexOf('unified.js') < 0) {
-    html = html.replace('</body>', stack + '\n</body>');
-  }
-
+  html = html.replace('</body>', stack + '\n</body>');
   document.open();
   document.write(html);
   document.close();
 })();
 </script>
 </head>
-<body style="font-family:system-ui;background:#14151B;color:#F2F1EC;padding:24px">Загрузка Копейки…</body>
+<body style="font-family:system-ui;background:#14151B;color:#F2F1EC;padding:24px">Загрузка…</body>
 </html>
