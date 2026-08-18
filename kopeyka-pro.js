@@ -1,4 +1,4 @@
-/* kopeyka-pro v7 — no duplicate comment field */
+/* kopeyka-pro v8 — voice on existing fComment only */
 (function(){'use strict';
 function N(v){return Number(v)||0}
 function A(v){return Array.isArray(v)?v:[]}
@@ -137,7 +137,6 @@ function injectHome(){
   var L=life();
   var html='';
   if(L.viewOnly) html+='<div class="life-viewonly-banner">\u0420\u0435\u0436\u0438\u043c \u00ab\u0442\u043e\u043b\u044c\u043a\u043e \u0441\u043c\u043e\u0442\u0440\u044e\u00bb</div>';
-
   if(N(L.monthGoal)>0){
     var y=T().slice(0,7), sv=0;
     A(STATE.reserveOps).forEach(function(o){
@@ -149,12 +148,10 @@ function injectHome(){
     html+='<div class="row"><span>\u041e\u0442\u043b\u043e\u0436\u0435\u043d\u043e</span><b class="pos">'+M(sv)+'</b></div>';
     html+='<div class="pro-bar"><i style="width:'+pct+'%"></i></div></div>';
   }
-
   var t=tiedUp();
   html+='<div class="card pro-tied"><div class="label">\u0417\u0430\u0440\u0435\u0437\u0435\u0440\u0432\u0438\u0440\u043e\u0432\u0430\u043d\u043e</div>';
   html+='<div class="mid-number">'+M(t.total)+'</div>';
   html+='<div class="faint">\u0440\u0435\u0437\u0435\u0440\u0432\u044b '+M(t.res)+' + \u0434\u043e\u043b\u0433\u0438 '+M(t.debt)+'</div></div>';
-
   if(typeof currentPeriod==='function' && typeof getShift==='function'){
     var p3=currentPeriod(), today=T(), left=0, inc=0;
     for(var d=p3.start; d<=p3.end; d=addDays(d,1)){
@@ -169,19 +166,16 @@ function injectHome(){
     html+='<div class="row"><span>\u0421\u043c\u0435\u043d \u043e\u0441\u0442\u0430\u043b\u043e\u0441\u044c</span><b>'+left+'</b></div>';
     html+='<div class="row"><span>\u0415\u0449\u0451 \u0441\u043e \u0441\u043c\u0435\u043d</span><b class="pos">'+M(inc)+'</b></div></div>';
   }
-
   html+='<div class="pro-chip-row">';
   html+='<button type="button" class="pro-chip hot" id="c1">\u0420\u0430\u0441\u0448\u0438\u0444\u0440\u043e\u0432\u043a\u0430</button>';
   html+='<button type="button" class="pro-chip" id="c2">\u0428\u0430\u0431\u043b\u043e\u043d\u044b</button>';
   html+='<button type="button" class="pro-chip" id="c3">30 \u0434\u043d\u0435\u0439</button>';
   html+='<button type="button" class="pro-chip" id="c4">\u041f\u043e\u0438\u0441\u043a</button>';
   html+='</div>';
-
   var box=document.createElement('div');
   box.id='proHomeExtras';
   box.className='pro-block';
   box.innerHTML=html;
-
   var grids=main.querySelectorAll('.grid2');
   var anchor = grids.length>=1 ? grids[0] : main.querySelector('.card');
   if(anchor && anchor.parentNode){
@@ -190,12 +184,10 @@ function injectHome(){
   } else {
     main.appendChild(box);
   }
-
   document.getElementById('c1').onclick=openBreakdown;
   document.getElementById('c2').onclick=openTemplates;
   document.getElementById('c3').onclick=openAnalytics;
   document.getElementById('c4').onclick=openSearch;
-
   main.querySelectorAll('.card.card-tight').forEach(function(card){
     var label=card.querySelector('.label');
     if(label && /\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e/i.test(label.textContent||'')){
@@ -240,27 +232,40 @@ function wireVoice(){
   new MutationObserver(function(){
     var m=root.querySelector('.modal');
     if(!m || m.querySelector('.life-mic')) return;
-    var act=m.querySelector('.modal-actions');
-    if(!act) return;
-    // Убираем старые поля комментария, чтобы не было дубля
-    m.querySelectorAll('.field').forEach(function(f){
-      var lab=f.querySelector('label');
-      if(lab && /\u043a\u043e\u043c\u043c\u0435\u043d\u0442/i.test(lab.textContent||'')) f.remove();
-    });
-    var w=document.createElement('div');
-    w.className='field';
-    w.innerHTML='<label>\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439</label><div style="display:flex;gap:8px"><input id="lifeComment" style="flex:1" placeholder="\u0422\u0435\u043a\u0441\u0442 \u0438\u043b\u0438 \ud83c\udfa4"><button type="button" class="life-mic" id="lifeMic">\ud83c\udfa4</button></div>';
-    act.parentNode.insertBefore(w, act);
+    var inp = m.querySelector('#fComment, #dComment, input[id*="omment"], textarea[id*="omment"]');
+    if(!inp){
+      m.querySelectorAll('.field').forEach(function(f){
+        var lab=f.querySelector('label');
+        if(lab && /\u043a\u043e\u043c\u043c\u0435\u043d\u0442/i.test(lab.textContent||'')){
+          var cand=f.querySelector('input,textarea');
+          if(cand) inp=cand;
+        }
+      });
+    }
+    if(!inp) return;
+    if(inp.parentNode && inp.parentNode.querySelector('.life-mic')) return;
+    var wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;gap:8px;align-items:center';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    inp.style.flex='1';
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.className='life-mic';
+    btn.id='lifeMic';
+    btn.textContent='\uD83C\uDFA4';
+    btn.title='\u0413\u043e\u043b\u043e\u0441';
+    wrap.appendChild(btn);
     var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    document.getElementById('lifeMic').onclick=function(){
+    btn.onclick=function(){
       if(!SR) return toast('\u0413\u043e\u043b\u043e\u0441 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d');
       var r=new SR(); r.lang='ru-RU';
-      var btn=this; btn.classList.add('rec');
+      btn.classList.add('rec');
       r.onresult=function(ev){
-        var inp=document.getElementById('lifeComment');
         inp.value+=(inp.value?' ':'')+ev.results[0][0].transcript;
       };
       r.onend=function(){ btn.classList.remove('rec'); };
+      r.onerror=function(){ btn.classList.remove('rec'); };
       try{ r.start(); }catch(e){ btn.classList.remove('rec'); }
     };
   }).observe(root,{childList:true,subtree:true});
