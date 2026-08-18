@@ -1,4 +1,4 @@
-/* kopeyka-pro v6 */
+/* kopeyka-pro v7 — no duplicate comment field */
 (function(){'use strict';
 function N(v){return Number(v)||0}
 function A(v){return Array.isArray(v)?v:[]}
@@ -242,6 +242,11 @@ function wireVoice(){
     if(!m || m.querySelector('.life-mic')) return;
     var act=m.querySelector('.modal-actions');
     if(!act) return;
+    // Убираем старые поля комментария, чтобы не было дубля
+    m.querySelectorAll('.field').forEach(function(f){
+      var lab=f.querySelector('label');
+      if(lab && /\u043a\u043e\u043c\u043c\u0435\u043d\u0442/i.test(lab.textContent||'')) f.remove();
+    });
     var w=document.createElement('div');
     w.className='field';
     w.innerHTML='<label>\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439</label><div style="display:flex;gap:8px"><input id="lifeComment" style="flex:1" placeholder="\u0422\u0435\u043a\u0441\u0442 \u0438\u043b\u0438 \ud83c\udfa4"><button type="button" class="life-mic" id="lifeMic">\ud83c\udfa4</button></div>';
