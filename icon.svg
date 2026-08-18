@@ -1,9 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" fill="#14151B"/>
-  <circle cx="256" cy="256" r="168" fill="#2F3440" stroke="#5EE0B5" stroke-width="10"/>
-  <circle cx="256" cy="256" r="148" fill="#242834"/>
-  <path d="M198 140 V372" stroke="#5EE0B5" stroke-width="28" stroke-linecap="round"/>
-  <path d="M198 256 L330 148" stroke="#F2F1EC" stroke-width="28" stroke-linecap="round"/>
-  <path d="M198 256 L330 364" stroke="#F2F1EC" stroke-width="28" stroke-linecap="round"/>
-  <circle cx="348" cy="348" r="16" fill="#4FD1A5"/>
+  <defs>
+    <radialGradient id="g" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#2A3D36"/>
+      <stop offset="100%" stop-color="#14151B"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="220" fill="url(#g)"/>
+  <circle cx="256" cy="256" r="150" fill="#2D3E38" stroke="#5EE0B5" stroke-width="14"/>
+  <circle cx="256" cy="256" r="118" fill="#24332E"/>
+  <path d="M210 160 V352" stroke="#F2F1EC" stroke-width="32" stroke-linecap="round"/>
+  <path d="M210 256 L320 160" stroke="#5EE0B5" stroke-width="32" stroke-linecap="round"/>
+  <path d="M210 256 L320 352" stroke="#F2F1EC" stroke-width="32" stroke-linecap="round"/>
+  <circle cx="340" cy="340" r="18" fill="#4FD1A5"/>
 </svg>
