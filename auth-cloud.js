@@ -1,8 +1,8 @@
 (async function(){
   try{
-    const n=8;
-    const parts=await Promise.all(Array.from({length:n},(_,i)=>fetch('r'+i+'.js?v=20',{cache:'no-store'}).then(r=>{
-      if(!r.ok)throw new Error('r'+i);
+    const n=16;
+    const parts=await Promise.all(Array.from({length:n},(_,i)=>fetch('s'+i+'.js?v=21',{cache:'no-store'}).then(r=>{
+      if(!r.ok)throw new Error('s'+i);
       return r.text();
     }));
     (0,eval)(parts.join(''));
