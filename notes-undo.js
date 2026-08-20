@@ -2,120 +2,17 @@
 (function(){
 'use strict';
 var HKEY='kopeyka_undo_history_v1', NKEY='kopeyka_notes_v1', MAX=20, restoring=false, lastSnapshot=null;
-
-function clone(x){ try{ return JSON.parse(JSON.stringify(x)); }catch(e){ return null; } }
-function same(a,b){ try{ return JSON.stringify(a)===JSON.stringify(b); }catch(e){ return false; } }
-function readHistory(){ try{ var v=JSON.parse(localStorage.getItem(HKEY)||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
-function writeHistory(v){ try{ localStorage.setItem(HKEY, JSON.stringify(v.slice(-MAX))); }catch(e){} }
-
-function historyLabel(before,after){
-  if(!before||!after) return 'Изменение данных';
-  var groups=[['debts','Долг'],['income','Доход'],['expenses','Расход'],['reserves','Резерв'],
-    ['reserveOps','Операция резерва'],['shiftsOverride','Смена'],['recurring','Обязательный платёж'],['settings','Настройки']];
-  for(var i=0;i<groups.length;i++) if(!same(before[groups[i][0]],after[groups[i][0]])) return groups[i][1];
-  return 'Изменение данных';
-}
-
-/* ---- Отслеживание истории: снимок STATE снимается перед каждым persist() ---- */
-lastSnapshot = clone(typeof STATE!=='undefined' ? STATE : null);
-if(typeof window.persist==='function'){
-  var origPersist=window.persist;
-  window.persist=function(){
-    if(!restoring){
-      var current=clone(STATE);
-      if(current && lastSnapshot && !same(lastSnapshot,current)){
-        var h=readHistory(); h.push(lastSnapshot); writeHistory(h);
-      }
-      lastSnapshot=current;
-    }
-    return origPersist.apply(this,arguments);
-  };
-}
-
-/* ---- Отмена действия: один модальный экран со списком снимков ---- */
-window.kopeykaOpenUndo=function(){
-  var list=readHistory(), current=clone(STATE);
-  var h='<div class="modal" style="max-width:420px;">';
-  h+=modalHeader('Отменить действие');
-  if(!list.length){
-    h+=emptyState('Нет действий для отмены','↶');
-    h+='</div>';
-    showModal(h);
-    return;
-  }
-  h+='<div class="faint" style="margin:0 0 12px">Выбери действие — приложение вернёт данные к состоянию до него.</div><div id="koUndoRows"></div></div>';
-  showModal(h);
-  var rows=document.getElementById('koUndoRows');
-  for(var i=list.length-1;i>=0;i--){
-    (function(idx){
-      var after = idx===list.length-1 ? current : list[idx+1];
-      var row=document.createElement('button');
-      row.type='button';
-      row.className='btn btn-secondary btn-block';
-      row.style.cssText='text-align:left;margin-bottom:8px;display:block';
-      row.innerHTML='<b>'+esc(historyLabel(list[idx],after))+'</b><div class="faint" style="margin-top:3px">Вернуть данные до этого действия</div>';
-      row.addEventListener('click',function(){
-        confirmDelete('Отменить это действие и все изменения после него?', function(){
-          var h2=readHistory(), target=h2[idx];
-          if(!target) return;
-          restoring=true;
-          STATE=clone(target);
-          writeHistory(h2.slice(0,idx));
-          lastSnapshot=clone(STATE);
-          restoring=false;
-          persist(); closeModal(); render(); showToast('Действие отменено');
-        });
-      });
-      rows.appendChild(row);
-    })(i);
-  }
-};
-
-document.addEventListener('keydown',function(e){
-  if(!(e.ctrlKey||e.metaKey) || e.key.toLowerCase()!=='z') return;
-  var tag=document.activeElement && document.activeElement.tagName;
-  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
-  e.preventDefault();
-  window.kopeykaOpenUndo();
-});
-
-/* ---- Заметки: полноценный экран, встроенный в обычную навигацию ---- */
-function readNotes(){ try{ var v=JSON.parse(localStorage.getItem(NKEY)||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
-function writeNotes(v){ try{ localStorage.setItem(NKEY, JSON.stringify(v)); }catch(e){} }
-
-window.renderNotes=function(){
-  var notes=readNotes();
-  var h='<div class="card"><div class="section-title" style="margin-top:0">Новая заметка</div>';
-  h+='<div class="field"><textarea id="noteText" rows="3" placeholder="Напиши что-нибудь…" style="width:100%;resize:vertical"></textarea></div>';
-  h+='<button class="btn btn-primary btn-block" id="noteAdd">Добавить заметку</button></div>';
-  h+='<div class="section-title">Мои заметки</div>';
-  if(!notes.length){
-    h+=emptyState('Заметок пока нет','📝');
-  }else{
-    h+='<div>';
-    notes.slice().reverse().forEach(function(nt,ri){
-      var real=notes.length-1-ri;
-      h+='<div class="card card-tight" style="margin-bottom:8px">'
-        +'<div style="white-space:pre-wrap;line-height:1.45">'+esc(nt.text)+'</div>'
-        +'<div class="faint" style="margin-top:8px">'+new Date(nt.ts).toLocaleString('ru-RU')+'</div>'
-        +'<button class="btn btn-ghost" style="padding-left:0" data-del-note="'+real+'">Удалить</button>'
-        +'</div>';
-    });
-    h+='</div>';
-  }
-  document.getElementById('main').innerHTML=h;
-  document.getElementById('noteAdd').addEventListener('click',function(){
-    var ta=document.getElementById('noteText'), t=ta.value.trim();
-    if(!t) return;
-    if(t.length>2000){ showToast('Заметка слишком длинная'); return; }
-    var a=readNotes(); a.push({text:t, ts:new Date().toISOString()}); writeNotes(a);
-    window.renderNotes();
-  });
-  document.querySelectorAll('[data-del-note]').forEach(function(b){
-    b.addEventListener('click',function(){
-      var a=readNotes(); a.splice(Number(b.dataset.delNote),1); writeNotes(a);
-      window.renderNotes();
-    });
-  });
-};
+function clone(x){try{return JSON.parse(JSON.stringify(x))}catch(e){return null}}
+function same(a,b){try{return JSON.stringify(a)===JSON.stringify(b)}catch(e){return false}}
+function readHistory(){try{var v=JSON.parse(localStorage.getItem(HKEY)||'[]');return Array.isArray(v)?v:[]}catch(e){return[]}}
+function writeHistory(v){try{localStorage.setItem(HKEY,JSON.stringify(v.slice(-MAX)))}catch(e){}}
+function historyLabel(before,after){if(!before||!after)return'Изменение данных';var groups=[['debts','Долг'],['income','Доход'],['expenses','Расход'],['reserves','Резерв'],['reserveOps','Операция резерва'],['shiftsOverride','Смена'],['recurring','Обязательный платёж'],['settings','Настройки']];for(var i=0;i<groups.length;i++)if(!same(before[groups[i][0]],after[groups[i][0]]))return groups[i][1];return'Изменение данных'}
+lastSnapshot=clone(typeof STATE!=='undefined'?STATE:null);
+if(typeof window.persist==='function'){var origPersist=window.persist;window.persist=function(){if(!restoring){var current=clone(STATE);if(current&&lastSnapshot&&!same(lastSnapshot,current)){var h=readHistory();h.push(lastSnapshot);writeHistory(h)}lastSnapshot=current}return origPersist.apply(this,arguments)}}
+window.kopeykaOpenUndo=function(){var list=readHistory(),current=clone(STATE),h='<div class="modal" style="max-width:420px;">';h+=modalHeader('Отменить действие');if(!list.length){h+=emptyState('Нет действий для отмены','↶')+'</div>';showModal(h);return}h+='<div class="faint" style="margin:0 0 12px">Выбери действие — приложение вернёт данные к состоянию до него.</div><div id="koUndoRows"></div></div>';showModal(h);var rows=document.getElementById('koUndoRows');for(var i=list.length-1;i>=0;i--){(function(idx){var after=idx===list.length-1?current:list[idx+1],row=document.createElement('button');row.type='button';row.className='btn btn-secondary btn-block';row.style.cssText='text-align:left;margin-bottom:8px;display:block';row.innerHTML='<b>'+esc(historyLabel(list[idx],after))+'</b><div class="faint" style="margin-top:3px">Вернуть данные до этого действия</div>';row.addEventListener('click',function(){confirmDelete('Отменить это действие и все изменения после него?',function(){var h2=readHistory(),target=h2[idx];if(!target)return;restoring=true;STATE=clone(target);writeHistory(h2.slice(0,idx));lastSnapshot=clone(STATE);restoring=false;persist();closeModal();render();showToast('Действие отменено')})});rows.appendChild(row)})(i)}};
+document.addEventListener('keydown',function(e){if(!(e.ctrlKey||e.metaKey)||e.key.toLowerCase()!=='z')return;var tag=document.activeElement&&document.activeElement.tagName;if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;e.preventDefault();window.kopeykaOpenUndo()});
+function readNotes(){try{var v=JSON.parse(localStorage.getItem(NKEY)||'[]');return Array.isArray(v)?v:[]}catch(e){return[]}}
+function writeNotes(v){try{localStorage.setItem(NKEY,JSON.stringify(v))}catch(e){}}
+window.renderNotes=function(){var notes=readNotes(),h='<div class="card"><div class="section-title" style="margin-top:0">Новая заметка</div><div class="field"><textarea id="noteText" rows="3" placeholder="Напиши что-нибудь…" style="width:100%;resize:vertical"></textarea></div><button class="btn btn-primary btn-block" id="noteAdd">Добавить заметку</button></div><div class="section-title">Мои заметки</div>';if(!notes.length)h+=emptyState('Заметок пока нет','📝');else{h+='<div>';notes.slice().reverse().forEach(function(nt,ri){var real=notes.length-1-ri;h+='<div class="card card-tight" style="margin-bottom:8px"><div style="white-space:pre-wrap;line-height:1.45">'+esc(nt.text)+'</div><div class="faint" style="margin-top:8px">'+new Date(nt.ts).toLocaleString('ru-RU')+'</div><button class="btn btn-ghost" style="padding-left:0" data-del-note="'+real+'">Удалить</button></div>'});h+='</div>'}document.getElementById('main').innerHTML=h;document.getElementById('noteAdd').addEventListener('click',function(){var ta=document.getElementById('noteText'),t=ta.value.trim();if(!t)return;if(t.length>2000){showToast('Заметка слишком длинная');return}var a=readNotes();a.push({text:t,ts:new Date().toISOString()});writeNotes(a);window.renderNotes()});document.querySelectorAll('[data-del-note]').forEach(function(b){b.addEventListener('click',function(){var a=readNotes();a.splice(Number(b.dataset.delNote),1);writeNotes(a);window.renderNotes()})})};
 })();
+(function(){'use strict';function num(v){var x=Number(v);return Number.isFinite(x)?x:0}function repair(){if(typeof STATE==='undefined'||!STATE)return;STATE.reserves=Array.isArray(STATE.reserves)?STATE.reserves:[];STATE.reserveOps=Array.isArray(STATE.reserveOps)?STATE.reserveOps:[];var valid={};STATE.reserves.forEach(function(r){if(r&&r.id!=null)valid[String(r.id)]=true});STATE.reserveOps=STATE.reserveOps.filter(function(o){return o&&o.reserveId!=null&&valid[String(o.reserveId)]&&(o.type==='deposit'||o.type==='withdraw')&&num(o.amount)>=0});STATE.reserves.forEach(function(r){var ops=STATE.reserveOps.filter(function(o){return String(o.reserveId)===String(r.id)});if(!ops.length)return;var net=ops.reduce(function(a,o){return a+(o.type==='withdraw'?-num(o.amount):num(o.amount))},0);if(num(r.saved)!==Math.round(net))r.saved=Math.max(0,Math.round(net))})}function patch(){if(typeof window.financeCore!=='function'||window.financeCore.__koIntegrity)return;var original=window.financeCore;var wrapped=function(state,s,e){var out=original(state,s,e);if(!out||typeof out!=='object')return out;var cash=num(out.currentBalance),expected=num(out.expectedIncome),planned=num(out.plannedRegular)+num(out.plannedObligatory),debts=num(out.debtsDue),reserve=num(out.reservesNeeded),days=num(out.remainingDays),before=cash+expected-planned-debts,after=before-reserve,strict=cash-planned-debts-reserve;out.forecastBeforeReserves=before;out.forecastAfterReserves=after;out.strictAvailable=strict;out.availableNow=cash;out.noReserveLimit=days?Math.floor(before/days):null;out.safeLimit=days?Math.floor(after/days):null;out.strictLimit=days?Math.floor(strict/days):null;return out};wrapped.__koIntegrity=true;window.financeCore=wrapped;window.computePeriodSummary=wrapped}repair();patch();if(typeof window.persist==='function'&&!window.persist.__koReserveIntegrity){var real=window.persist;var safe=function(){repair();return real.apply(this,arguments)};safe.__koReserveIntegrity=true;window.persist=safe}})();
