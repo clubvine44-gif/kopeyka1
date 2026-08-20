@@ -1,12 +1,11 @@
 (async function(){
   try{
-    const n=5;
-    const parts=await Promise.all(Array.from({length:n},(_,i)=>fetch('ac'+i+'.js?v=11',{cache:'no-store'}).then(r=>{
-      if(!r.ok)throw new Error('ac'+i);
+    const n=12;
+    const parts=await Promise.all(Array.from({length:n},(_,i)=>fetch('g'+i+'.b64?v=12',{cache:'no-store'}).then(r=>{
+      if(!r.ok)throw new Error('g'+i+' '+r.status);
       return r.text();
     }));
-    (0,eval)(parts.join(''));
-  }catch(e){
-    console.error(e);
-  }
+    const code=new TextDecoder().decode(Uint8Array.from(atob(parts.join('').replace(/\s+/g,'')),c=>c.charCodeAt(0)));
+    (0,eval)(code);
+  }catch(e){console.error('cloud load',e)}
 })();
